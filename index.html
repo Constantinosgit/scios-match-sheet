@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SCIOS — Match Sheet Builder</title>
+<style>
+  :root, :root[data-theme="dark"]{
+    --base:#080D1A; --surface1:#0F1629; --surface2:#1A2235; --surface3:#243047;
+    --border:#2D3A52; --text:#E8EEFF; --text2:#8899BB; --muted:#4A5A78;
+    --accent:#3B82F6; --cyan:#06D6F5; --green:#10B981; --amber:#F59E0B; --red:#EF4444;
+    --radius:10px;
+  }
+  :root[data-theme="light"]{
+    --base:#F0F4FF; --surface1:#FFFFFF; --surface2:#F5F8FF; --surface3:#EBF0FF;
+    --border:#C8D4EC; --text:#0A1628; --text2:#3A5070; --muted:#7A90B0;
+    --accent:#3B82F6; --cyan:#0891B2; --green:#059669; --amber:#D97706; --red:#DC2626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    background:var(--base);color:var(--text);font-size:16px;line-height:1.45}
+  h1,h2,h3{margin:0;font-weight:700}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;
+    padding:11px 16px;font-size:15px;font-weight:600;min-height:44px;transition:filter .15s,background .15s}
+  button:hover{filter:brightness(1.12)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-ghost{background:var(--surface2);color:var(--text2)}
+  .btn-ghost:hover{color:var(--text)}
+  .btn-danger{background:transparent;color:var(--red);padding:6px 10px;min-height:auto;font-size:18px}
+  input,select{font-family:inherit;font-size:16px;background:var(--surface2);
+    color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 12px;outline:none;min-height:44px}
+  input:focus,select:focus{border-color:var(--accent)}
+  input.num{width:52px;text-align:center;padding:8px 4px}
+  label{color:var(--text2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+
+  /* Home/Away toggle */
+  .teamtoggle{display:flex;gap:8px;margin-bottom:12px}
+  .tgbtn{flex:1;background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-size:16px}
+  .tgbtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .teampanel.hidden-screen{display:none}
+
+  /* tap-to-add affordance */
+  .addbtn{display:inline-flex;align-items:center;justify-content:center;
+    min-width:30px;height:30px;border-radius:50%;background:var(--surface3);
+    color:var(--cyan);font-weight:800;font-size:20px;flex:none}
+  .player.in-xi .addbtn{background:var(--accent);color:#fff}
+  .player.in-xi{border-color:var(--accent)}
+
+  header.app{display:flex;align-items:center;gap:10px;padding:12px 20px;
+    border-bottom:1px solid var(--border);background:var(--surface1);position:sticky;top:0;z-index:20}
+  header.app .spacer{flex:1}
+  header.app button{padding:9px 13px;min-height:40px;font-size:14px}
+
+  .tabs{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--border);background:var(--surface1)}
+  .tab{background:transparent;color:var(--text2);border-bottom:2px solid transparent;border-radius:0;padding:9px 16px;min-height:auto;font-weight:600}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--text);border-bottom-color:var(--cyan)}
+
+  main{padding:20px;max-width:1280px;margin:0 auto}
+  .card{background:var(--surface1);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+
+  /* match header bar */
+  .matchbar{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+  .matchbar .team-name{font-size:20px;font-weight:800;text-align:center}
+  .matchbar .vs{text-align:center;color:var(--muted);font-weight:700}
+  .score{display:flex;gap:8px;align-items:center;justify-content:center}
+  .score input{width:54px;text-align:center;font-size:22px;font-weight:800;padding:6px}
+
+  /* roster + xi lists */
+  .listcol h3{font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+  .player{display:flex;align-items:center;gap:10px;background:var(--surface2);
+    border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px;
+    cursor:pointer;min-height:50px}
+  .player:active{filter:brightness(1.15)}
+  .player.dragging{opacity:.4}
+  .player .pnum{background:var(--surface3);border-radius:6px;width:48px;min-width:48px;text-align:center;
+    font-weight:700;padding:8px 4px;font-size:15px}
+  .player .pname{flex:1;font-size:16px}
+  .player .ppos{color:var(--muted);font-size:12px;text-transform:uppercase}
+  .dropzone{min-height:60px;border:1.5px dashed var(--border);border-radius:8px;padding:8px;transition:border-color .15s,background .15s}
+  .dropzone.over{border-color:var(--accent);background:rgba(59,130,246,.08)}
+  .xi-count{color:var(--muted);font-size:12px;font-weight:600}
+  .xi-count.full{color:var(--green)}
+
+  /* formation pitch — green with mowing stripes */
+  .pitch{position:relative;border:1px solid rgba(255,255,255,.25);border-radius:10px;
+    aspect-ratio:68/52;overflow:hidden;
+    background:
+      repeating-linear-gradient(0deg, #2e8b40 0 12.5%, #2a8139 12.5% 25%);}
+  .pitch .line{position:absolute;background:rgba(255,255,255,.55)}
+  .pitch .halfway{left:0;right:0;top:50%;height:2px}
+  .pitch .circle{position:absolute;left:50%;top:50%;width:22%;aspect-ratio:1;
+    border:2px solid rgba(255,255,255,.55);border-radius:50%;transform:translate(-50%,-50%)}
+  .pitch .box{position:absolute;left:50%;transform:translateX(-50%);
+    width:50%;height:16%;border:2px solid rgba(255,255,255,.55)}
+  .pitch .box.top{top:0;border-top:none}.pitch .box.bot{bottom:0;border-bottom:none}
+  .spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:64px}
+  .spot .dot{width:34px;height:34px;margin:0 auto;border-radius:50%;
+    background:linear-gradient(160deg,#0b2f6b,#1f4ed8);
+    color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;
+    border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .spot .lbl{font-size:10px;margin-top:2px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* brand logo in header */
+  .brand-logo{height:30px;width:auto;display:block}
+  .logo-sub{font-weight:700;font-size:14px;color:var(--text2);letter-spacing:.02em;
+    padding-left:10px;margin-left:6px;border-left:1px solid var(--border)}
+
+  /* team crest */
+  .crest{width:22px;height:22px;object-fit:contain;flex:none;border-radius:3px}
+  .crest-lg{width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:8px}
+  .team-name .crest-lg{width:28px;height:28px}
+
+  /* subs */
+  .sub-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+  .sub-row select{flex:1;min-width:120px}
+  .sub-row .min{width:64px}
+  .sub-row .arrow{color:var(--muted)}
+
+  .saved-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--border);
+    border-radius:8px;margin-bottom:6px;background:var(--surface2)}
+  .saved-item .meta{flex:1}.saved-item .meta b{display:block}
+  .saved-item .meta small{color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  .hint{color:var(--muted);font-size:12px;margin-top:4px}
+
+  /* ===== MOBILE ===== */
+  @media(max-width:760px){
+    main{padding:12px}
+    .card{padding:13px;margin-bottom:12px}
+    header.app{padding:10px 12px;gap:8px;flex-wrap:wrap}
+    .brand-logo{height:26px}
+    .logo-sub{margin-left:auto;border-left:none;padding-left:0}  /* push subtitle right */
+    header.app .spacer{display:none}
+    header.app button{flex:1 1 28%;padding:11px 6px;font-size:13px;min-width:0}
+    .tabs{padding:8px 10px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tab{white-space:nowrap;font-size:15px}
+
+    /* matchbar stacks: home, score, away each full width */
+    .matchbar{grid-template-columns:1fr;gap:14px}
+    .matchbar .vs{display:none}
+    .score{justify-content:flex-start}
+    .score input{width:64px;font-size:24px}
+
+    /* XI + Squad stack vertically, full width */
+    .grid2{grid-template-columns:1fr;gap:14px}
+
+    /* bigger pitch dots / labels on the formation view */
+    .pitch{aspect-ratio:5/6}            /* taller pitch reads better on a phone */
+    .spot{width:58px}
+    .spot .dot{width:40px;height:40px;font-size:16px}
+    .spot .lbl{font-size:11px}
+
+    /* substitutions: stack the controls so they never overflow */
+    .sub-row{gap:6px}
+    .sub-row select{flex:1 1 100%;min-width:0}
+    .sub-row .min{width:80px}
+
+    /* fixture/competition pickers: each control full width */
+    #fixType,#fixGender,#fixComp,#fixMatch{flex:1 1 100%!important;min-width:0!important}
+  }
+
+  /* print */
+  @media print{
+    .teamtoggle{display:none!important}
+    .teampanel.hidden-screen{display:block!important}  /* both teams print */
+    .addbtn{display:none!important}
+    body{background:#fff;color:#000}
+    header.app,.tabs,.no-print{display:none!important}
+    main{max-width:none;padding:0}
+    .card{border:1px solid #ccc;box-shadow:none;page-break-inside:avoid}
+    .pitch{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .spot .dot{background:#1f4ed8 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .brand-logo{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <img id="brandLogo" class="brand-logo" src="logos/Logo-scios-dark.png" alt="Science of Sports" />
+  <div class="logo-sub">Match Sheet</div>
+  <div class="spacer"></div>
+  <button class="btn-ghost no-print" id="themeBtn" onclick="MS.toggleTheme()" title="Switch light / dark">🌙</button>
+  <button class="btn-ghost no-print" onclick="MS.newSheet()">New</button>
+  <button class="btn-ghost no-print" onclick="MS.saveSheet()">Save</button>
+  <button class="btn-ghost no-print" onclick="MS.exportSCIOS()" title="Export lineup JSON for the SCIOS platform">↗ SCIOS</button>
+  <button class="btn-ghost no-print" onclick="MS.share()" title="Share to WhatsApp / email">📲 Share</button>
+  <button class="btn-primary no-print" onclick="MS.exportPDF()">Export PDF</button>
+</header>
+
+<div class="tabs no-print">
+  <button class="tab active" data-tab="build" onclick="MS.tab('build')">Match Sheet</button>
+  <button class="tab" data-tab="teams" onclick="MS.tab('teams')">Teams &amp; Rosters</button>
+  <button class="tab" data-tab="saved" onclick="MS.tab('saved')">Saved Sheets</button>
+</div>
+
+<main>
+  <!-- ===== BUILD TAB ===== -->
+  <section id="tab-build">
+    <div id="draftNote" class="hint no-print" style="display:none;color:var(--green);margin-bottom:8px">
+      ↩︎ Restored your last in-progress sheet. Press <b>New</b> to start fresh.
+    </div>
+    <div class="card" id="fixtureCard" style="display:none">
+      <label>Load a fixture (auto-fills teams &amp; date)</label>
+      <div class="row" style="margin-top:4px">
+        <select id="fixType" onchange="MS.onFixType()" style="flex:1.4;min-width:150px"></select>
+        <select id="fixGender" onchange="MS.onFixType()" style="flex:1;min-width:100px"></select>
+        <select id="fixComp" onchange="MS.onFixComp(this.value)" style="flex:1.6;min-width:160px"></select>
+        <select id="fixMatch" onchange="MS.loadFixture(this.value)" style="flex:3;min-width:240px"></select>
+      </div>
+      <div id="fixPickStatus" class="hint"></div>
+    </div>
+    <div class="card" id="leagueCard">
+      <label>Competition</label>
+      <select id="league" onchange="MS.pickLeague(this.value)" style="width:100%;margin-top:4px"></select>
+      <div class="hint">Or pick the competition manually — both team lists below filter to it.</div>
+    </div>
+    <div class="card">
+      <div class="matchbar">
+        <div>
+          <label>Home team</label>
+          <select id="homeSelect" onchange="MS.pickTeam('home',this.value)" style="width:100%"></select>
+          <div class="team-name" id="homeName">—</div>
+        </div>
+        <div>
+          <div class="vs">DATE</div>
+          <input type="text" id="matchDate" placeholder="DD/MM/YYYY" inputmode="numeric"
+                 pattern="\d{2}/\d{2}/\d{4}" style="width:120px;text-align:center" onchange="MS.touch()" />
+          <div class="score">
+            <input class="num" id="homeScore" type="number" min="0" value="0" onchange="MS.touch()" />
+            <span style="color:var(--muted)">:</span>
+            <input class="num" id="awayScore" type="number" min="0" value="0" onchange="MS.touch()" />
+          </div>
+        </div>
+        <div>
+          <label>Away team</label>
+          <select id="awaySelect" onchange="MS.pickTeam('away',this.value)" style="width:100%"></select>
+          <div class="team-name" id="awayName">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home/Away toggle: shows one team at a time on screen (both print to PDF) -->
+    <div class="teamtoggle no-print">
+      <button id="tgHome" class="tgbtn active" onclick="MS.showTeam('home')">Home team</button>
+      <button id="tgAway" class="tgbtn" onclick="MS.showTeam('away')">Away team</button>
+    </div>
+    <div class="teampanels">
+      <div class="card teampanel" id="homePanel" data-side="home"></div>
+      <div class="card teampanel" id="awayPanel" data-side="away"></div>
+    </div>
+  </section>
+
+  <!-- ===== TEAMS TAB ===== -->
+  <section id="tab-teams" style="display:none">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2>Teams &amp; Rosters</h2>
+        <div class="row">
+          <input id="newTeamName" placeholder="New team name" />
+          <button class="btn-primary" onclick="MS.addTeam()">Add team</button>
+          <button class="btn-ghost" id="adminBtn" onclick="MS.toggleAdmin()">🔒 Admin</button>
+        </div>
+      </div>
+      <!-- Admin-only data controls: importing players/fixtures and clearing data -->
+      <div id="adminTools" class="row" style="margin-top:10px;display:none">
+        <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="MS.importCSV(event)">
+        <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">⬆ Import players (CSV)</button>
+        <input type="file" id="fixFile" accept=".csv" style="display:none" onchange="MS.importFixtures(event)">
+        <button class="btn-ghost" onclick="document.getElementById('fixFile').click()">⬆ Import fixtures (CSV)</button>
+        <button class="btn-danger" onclick="MS.clearAllTeams()">Clear all</button>
+      </div>
+      <p class="hint" id="adminHint">Importing players &amp; fixtures and clearing data are <b>admin-only</b> — tap <b>🔒 Admin</b> to unlock. Anyone can build and export match sheets.</p>
+      <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device.</p>
+      <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
+      <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
+    </div>
+    <div id="teamsEditor"></div>
+  </section>
+
+  <!-- ===== SAVED TAB ===== -->
+  <section id="tab-saved" style="display:none">
+    <div class="card">
+      <h2>Saved Match Sheets</h2>
+      <div id="savedList"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const FORMATIONS = {
+  "4-4-2":   [[50,92],[18,74],[39,76],[61,76],[82,74],[16,50],[39,52],[61,52],[84,50],[38,26],[62,26]],
+  "4-3-3":   [[50,92],[18,74],[39,76],[61,76],[82,74],[30,54],[50,56],[70,54],[22,28],[50,22],[78,28]],
+  "4-2-3-1": [[50,92],[18,74],[39,76],[61,76],[82,74],[38,58],[62,58],[22,38],[50,36],[78,38],[50,18]],
+  "4-1-4-1": [[50,92],[18,74],[39,76],[61,76],[82,74],[50,60],[18,44],[39,42],[61,42],[82,44],[50,20]],
+  "3-5-2":   [[50,92],[30,76],[50,78],[70,76],[12,54],[35,54],[50,56],[65,54],[88,54],[38,26],[62,26]],
+  "3-4-3":   [[50,92],[30,76],[50,78],[70,76],[18,54],[40,54],[60,54],[82,54],[22,28],[50,22],[78,28]],
+  "5-3-2":   [[50,92],[12,72],[32,76],[50,78],[68,76],[88,72],[30,52],[50,54],[70,52],[38,26],[62,26]],
+  "4-5-1":   [[50,92],[18,74],[39,76],[61,76],[82,74],[14,50],[34,52],[50,54],[66,52],[86,50],[50,22]]
+};
+const POSN = ["GK","RB","CB","CB","LB","RM","CM","CM","LM","ST","ST"];
+
+const MS = {
+  data:{teams:[], sheets:[], fixtures:[]},
+  cur:{home:null, away:null}, // team objects copied into the current sheet
+  curId:null,
+
+  // ---------- persistence ----------
+  load(){
+    try{ this.data = JSON.parse(localStorage.getItem('scios_ms')||'') || this.data; }catch(e){}
+    if(!this.data.fixtures) this.data.fixtures=[];
+    if(!this.data.teams) this.data.teams=[];
+    if(!this.data.sheets) this.data.sheets=[];
+    if(this.data.teams.length===0) this.seed();
+  },
+  persist(){ localStorage.setItem('scios_ms', JSON.stringify(this.data)); },
+  seed(){
+    // a few Cyprus teams to start; fully editable
+    const mk=(name,players)=>({id:crypto.randomUUID(),name,players:players.map((p,i)=>({id:crypto.randomUUID(),num:i+1,name:p,pos:''}))});
+    this.data.teams=[
+      mk("Omonia Nicosia",["Fabiano","Lewis","Diomande","Bruno","Panayiotou","Loizou","Bezus","Semedo","Charalambous","Neophytou","Yuste"]),
+      mk("APOEL",["Belec","Tomovic","Savic","Roberge","Pileas","Donis","Yfantidis","Kvilitaia","Pons","Al Taamari","Ioannou"]),
+      mk("Anorthosis",["Loria","Sergiou","Risvanis","Stoppila","Lang","Warda","Kyriakou","Correia","Ioannou","Spoljaric","Squilacci"])
+    ];
+    this.persist();
+  },
+
+  // ---------- tabs ----------
+  tab(name){
+    ['build','teams','saved'].forEach(t=>{
+      document.getElementById('tab-'+t).style.display = (t===name)?'':'none';
+      document.querySelector('.tab[data-tab="'+t+'"]').classList.toggle('active', t===name);
+    });
+    if(name==='teams') this.renderTeams();
+    if(name==='saved') this.renderSaved();
+  },
+
+  // ---------- team/roster editor ----------
+  addTeam(){
+    const el=document.getElementById('newTeamName'); const name=el.value.trim();
+    if(!name) return;
+    this.data.teams.push({id:crypto.randomUUID(),name,players:[]});
+    el.value=''; this.persist(); this.renderTeams(); this.refreshSelects();
+  },
+  // ---------- CSV import (Cyprus Operation Sheet → Corrected players) ----------
+  importCSV(ev){
+    if(!this.requireAdmin()){ ev.target.value=''; return; }
+    const file=ev.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{ this._ingestCSV(e.target.result); }
+      catch(err){ document.getElementById('importStatus').textContent='Import failed: '+err.message;
+                  document.getElementById('importStatus').style.color='var(--red)'; }
+      ev.target.value=''; // allow re-importing same file
+    };
+    reader.readAsText(file);
+  },
+  _ingestCSV(text){
+    const rows=parseCSV(text);
+    if(!rows.length) throw new Error('empty file');
+    // locate the header row (may not be the first line — sheet has banner rows)
+    let hi=rows.findIndex(r=>r.map(c=>c.toLowerCase().trim()).includes('teamname'));
+    if(hi<0) hi=rows.findIndex(r=>r.some(c=>/^name$/i.test(c.trim())));
+    if(hi<0) throw new Error('could not find a header row with Name / TeamName');
+    const head=rows[hi].map(c=>c.trim().toLowerCase());
+    const col=(...names)=>{ for(const n of names){const i=head.indexOf(n); if(i>=0)return i;} return -1; };
+    const iName=col('name'), iTeam=col('teamname','team name','team'),
+          iLeague=col('leaguename','league name','league','competition'),
+          iCorr=col('correct name','correct name (sos input)','correctname'), iId=col('id');
+    if(iName<0||iTeam<0) throw new Error('missing Name or TeamName column');
+
+    // group players by team, corrected name wins; remember each team's league
+    const byTeam=new Map(); const teamLeague=new Map(); let count=0, corrected=0;
+    for(let r=hi+1;r<rows.length;r++){
+      const row=rows[r]; if(!row) continue;
+      const team=(row[iTeam]||'').trim();
+      const league=iLeague>=0?(row[iLeague]||'').trim():'';
+      const raw=(row[iName]||'').trim();
+      const corr=iCorr>=0?(row[iCorr]||'').trim():'';
+      const name=corr||raw;
+      if(!team||!name) continue;
+      if(corr) corrected++;
+      if(!byTeam.has(team)){ byTeam.set(team,[]); teamLeague.set(team, league); }
+      byTeam.get(team).push({id:crypto.randomUUID(), num:byTeam.get(team).length+1, name, pos:'',
+                             srcId:iId>=0?(row[iId]||'').trim():''});
+      count++;
+    }
+    if(!count) throw new Error('no player rows found under the header');
+
+    // Default to a clean slate: replace ALL existing teams with the CSV contents
+    // (removes the sample/seed teams). Cancel = merge instead.
+    const replaceAll = this.data.teams.length===0 ? true
+      : confirm(`Import found ${byTeam.size} teams / ${count} players.\n\n`
+        + `OK  = REPLACE all current teams with this list (clears the ${this.data.teams.length} existing teams — recommended for a clean load).\n`
+        + `Cancel = MERGE (add/update teams, keep the rest).`);
+
+    let teamsAdded=0, teamsUpdated=0;
+    if(replaceAll){
+      this.data.teams=[];
+      for(const [teamName,players] of byTeam){
+        this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:teamLeague.get(teamName)||'', players}); teamsAdded++;
+      }
+    } else {
+      for(const [teamName,players] of byTeam){
+        const existing=this.data.teams.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
+        if(existing){ existing.players=players; existing.league=teamLeague.get(teamName)||existing.league||''; teamsUpdated++; }
+        else { this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:teamLeague.get(teamName)||'', players}); teamsAdded++; }
+      }
+    }
+    this.persist(); this.renderTeams(); this.refreshSelects();
+    const s=document.getElementById('importStatus');
+    s.style.color='var(--green)';
+    s.textContent=(replaceAll?`Replaced all teams. `:``)
+      +`Imported ${count} players across ${byTeam.size} teams `
+      +`(${teamsAdded} new, ${teamsUpdated} updated; ${corrected} used a corrected name).`;
+  },
+
+  // ---------- fixtures import ----------
+  importFixtures(ev){
+    if(!this.requireAdmin()){ ev.target.value=''; return; }
+    const file=ev.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{ this._ingestFixtures(e.target.result); }
+      catch(err){ const s=document.getElementById('fixStatus'); s.style.color='var(--red)'; s.textContent='Fixture import failed: '+err.message; }
+      ev.target.value='';
+    };
+    reader.readAsText(file);
+  },
+  _ingestFixtures(text){
+    const rows=parseCSV(text);
+    let hi=rows.findIndex(r=>r.some(c=>/home team/i.test(c)) && r.some(c=>/away team/i.test(c)));
+    if(hi<0) throw new Error('could not find a header row with Home team / Away team');
+    const head=rows[hi].map(c=>c.trim().toLowerCase());
+    const col=(...names)=>{ for(const n of names){const i=head.findIndex(h=>h===n||h.startsWith(n)); if(i>=0)return i;} return -1; };
+    const iRound=col('round'), iDate=col('match date (local','match date','date'),
+          iKO=col('kick-off (local','kick-off','kick off'), iComp=col('competition'),
+          iHome=col('home team'), iAway=col('away team');
+    if(iHome<0||iAway<0) throw new Error('missing Home/Away team columns');
+
+    const fx=[];
+    for(let r=hi+1;r<rows.length;r++){
+      const row=rows[r]; if(!row||row.every(c=>!c.trim())) continue;
+      const home=(row[iHome]||'').trim(), away=(row[iAway]||'').trim();
+      if(!home||!away) continue;
+      fx.push({
+        round:(row[iRound]||'').trim(),
+        date:iDate>=0?normDate((row[iDate]||'').trim()):'',
+        ko:iKO>=0?(row[iKO]||'').trim():'',
+        comp:iComp>=0?(row[iComp]||'').trim():'',
+        home, away
+      });
+    }
+    if(!fx.length) throw new Error('no fixture rows found');
+    this.data.fixtures=fx; this.persist(); this.refreshFixturePicker();
+    const comps=new Set(fx.map(f=>f.comp));
+    const s=document.getElementById('fixStatus'); s.style.color='var(--green)';
+    s.textContent=`Imported ${fx.length} fixtures across ${comps.size} competitions. Use the fixture picker on the Match Sheet tab.`;
+  },
+
+  // ---------- fixture picker (Match Sheet tab) ----------
+  // Mirror the SCIOS platform's structure: Type (Club/National) + Gender (Men/Women) + Age.
+  // Classify a competition as a National-team or Club competition by its name.
+  compType(name){
+    const n=name||'';
+    if(/\b(uefa|international|tournament|championship|youth league|women)/i.test(n)) return 'National Teams';
+    if(/friendly/i.test(n)) return 'National Teams';   // Cyprus Uxx Friendly Match → national team
+    return 'Club Competitions';
+  },
+  // Gender from the competition name (the file's Gender column is unreliable — all "Male").
+  compGender(name){ return /women/i.test(name||'') ? 'Women' : 'Men'; },
+  // Short age label like the platform badges: U14…U21, else Senior.
+  compAge(name){ const m=(name||'').match(/U(\d{2})/i); return m ? 'U'+m[1] : 'Senior'; },
+  // A clean display label: short age + a hint of the type when useful.
+  compLabel(name){
+    const age=this.compAge(name);
+    if(/friendly/i.test(name)) return age+' Friendly';
+    if(/uefa/i.test(name))     return age+' (UEFA)';
+    if(/international tournament/i.test(name)) return age+' (Int. Tournament)';
+    if(/division 2/i.test(name)) return 'Senior (Division 2)';
+    if(/championship/i.test(name)) return age+' Championship';
+    if(/european qualifiers/i.test(name)) return age+' (Euro Qualifiers)';
+    return age;
+  },
+  refreshFixturePicker(){
+    const card=document.getElementById('fixtureCard');
+    const has=this.data.fixtures.length>0;
+    card.style.display = has ? '' : 'none';
+    if(!has) return;
+    document.getElementById('fixType').innerHTML=
+      '<option value="">— select type —</option>'
+      + '<option value="Club Competitions">🏟️ Club Competitions</option>'
+      + '<option value="National Teams">🌍 National Teams</option>';
+    document.getElementById('fixGender').innerHTML=
+      '<option value="Men">Men</option><option value="Women">Women</option>';
+    document.getElementById('fixComp').innerHTML='<option value="">competition</option>';
+    document.getElementById('fixMatch').innerHTML='<option value="">match</option>';
+  },
+  // Fixtures matching the current Type + Gender selection.
+  _fixScope(){
+    const type=document.getElementById('fixType').value;
+    const gender=document.getElementById('fixGender').value||'Men';
+    return this.data.fixtures.filter(f=>this.compType(f.comp)===type && this.compGender(f.comp)===gender);
+  },
+  onFixType(){
+    // For National Teams the Competition dropdown lists ONE entry per age group
+    // (U15…U21, Senior) — matching the platform's national-team cards. Club
+    // Competitions list per league (each age is a single league anyway).
+    const type=document.getElementById('fixType').value;
+    const scope=this._fixScope();
+    const ages=[...new Set(scope.map(f=>this.compAge(f.comp)))]
+      .sort((a,b)=>{
+        const aN=a==='Senior'?99:+a.slice(1), bN=b==='Senior'?99:+b.slice(1);
+        return aN-bN;
+      });
+    document.getElementById('fixComp').innerHTML='<option value="">— select age group —</option>'
+      + ages.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    document.getElementById('fixMatch').innerHTML='<option value="">match</option>';
+  },
+  onFixComp(age){
+    // All fixtures in scope for this age group, listed directly (round shown inline,
+    // sorted by round then date). No separate round filter.
+    const scopeSet=new Set(this._fixScope());
+    const list=this.data.fixtures
+      .map((f,idx)=>({f,idx}))
+      .filter(({f})=>scopeSet.has(f) && this.compAge(f.comp)===age)
+      .sort((a,b)=>((parseInt(a.f.round)||0)-(parseInt(b.f.round)||0)) || String(a.f.date).localeCompare(String(b.f.date)));
+    const multiComp=new Set(list.map(({f})=>f.comp)).size>1;
+    document.getElementById('fixMatch').innerHTML='<option value="">— select match —</option>'
+      + list.map(({f,idx})=>{
+          const r=f.round?`R${f.round} · `:'';
+          const tag=multiComp?` [${this.compLabel(f.comp)}]`:'';
+          return `<option value="${idx}">${r}${f.date?f.date+' · ':''}${esc(f.home)} vs ${esc(f.away)}${esc(tag)}</option>`;
+        }).join('');
+  },
+  loadFixture(idx){
+    if(idx==='') return;
+    const f=this.data.fixtures[+idx]; if(!f) return;
+    // set competition filter to the fixture's competition if it exists in team data, else leave as-is
+    // match teams by name (case-insensitive); fixtures may use a slightly different comp label than rosters
+    const findTeam=(name)=>this.data.teams.find(t=>t.name.toLowerCase()===name.toLowerCase());
+    const ht=findTeam(f.home), at=findTeam(f.away);
+    // align the manual competition dropdown to the home team's roster league (so the dropdowns stay coherent)
+    this.league = ht ? (ht.league||'') : this.league;
+    this.refreshSelects();
+    const missing=[];
+    if(ht){ this.pickTeam('home', ht.id); document.getElementById('homeSelect').value=ht.id; } else missing.push(f.home);
+    if(at){ this.pickTeam('away', at.id); document.getElementById('awaySelect').value=at.id; } else missing.push(f.away);
+    if(f.date) document.getElementById('matchDate').value=f.date;
+    this.touch();
+    const st=document.getElementById('fixPickStatus');
+    if(missing.length){ st.style.color='var(--amber)';
+      st.textContent='Loaded. No imported roster for: '+missing.join(', ')+' — add/import that team to fill its squad.'; }
+    else { st.style.color='var(--green)'; st.textContent='Loaded '+f.home+' vs '+f.away+(f.date?' ('+f.date+')':'')+'.'; }
+  },
+
+  clearAllTeams(){
+    if(!this.requireAdmin()) return;
+    if(!this.data.teams.length){ alert('No teams to clear.'); return; }
+    if(!confirm(`Delete ALL ${this.data.teams.length} teams and their rosters? This cannot be undone.`)) return;
+    this.data.teams=[]; this.persist(); this.renderTeams(); this.refreshSelects();
+    const s=document.getElementById('importStatus');
+    if(s){ s.style.color='var(--text2)'; s.textContent='All teams cleared. Import a CSV to load fresh.'; }
+  },
+
+  delTeam(id){
+    if(!confirm('Delete this team and its roster?'))return;
+    this.data.teams=this.data.teams.filter(t=>t.id!==id);
+    this.persist(); this.renderTeams(); this.refreshSelects();
+  },
+  addPlayer(teamId){
+    const t=this.data.teams.find(x=>x.id===teamId);
+    t.players.push({id:crypto.randomUUID(),num:t.players.length+1,name:'New player',pos:''});
+    this.persist(); this.renderTeams();
+  },
+  delPlayer(teamId,pid){
+    const t=this.data.teams.find(x=>x.id===teamId);
+    t.players=t.players.filter(p=>p.id!==pid); this.persist(); this.renderTeams();
+  },
+  editPlayer(teamId,pid,field,val){
+    const t=this.data.teams.find(x=>x.id===teamId);
+    const p=t.players.find(p=>p.id===pid);
+    p[field]= field==='num'? (parseInt(val)||0) : val;
+    this.persist();
+  },
+  renderTeams(){
+    const root=document.getElementById('teamsEditor');
+    root.innerHTML = this.data.teams.map(t=>`
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h3>${esc(t.name)} <span class="xi-count">(${t.players.length})</span></h3>
+          <div class="row">
+            <button class="btn-ghost" onclick="MS.addPlayer('${t.id}')">+ Player</button>
+            <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete team</button>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          ${t.players.map(p=>`
+            <div class="player" style="cursor:default">
+              <input class="num" type="number" value="${p.num}" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
+              <input class="pname" style="flex:1" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
+              <input style="width:70px" placeholder="POS" value="${esc(p.pos)}" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">
+              <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
+            </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
+        </div>
+      </div>`).join('') || '<div class="empty">No teams yet. Add one above.</div>';
+  },
+
+  // ---------- match sheet build ----------
+  shownSide:'home',
+  showTeam(side){
+    this.shownSide=side;
+    document.getElementById('homePanel').classList.toggle('hidden-screen', side!=='home');
+    document.getElementById('awayPanel').classList.toggle('hidden-screen', side!=='away');
+    document.getElementById('tgHome').classList.toggle('active', side==='home');
+    document.getElementById('tgAway').classList.toggle('active', side==='away');
+  },
+  leagues(){
+    // distinct, sorted league names (blank league grouped as "Other")
+    const set=new Set(this.data.teams.map(t=>(t.league||'').trim()).filter(Boolean));
+    return [...set].sort((a,b)=>a.localeCompare(b));
+  },
+  league:'',  // the single, shared competition filter
+  refreshSelects(){
+    const anyLeagues=this.leagues().length>0;
+    const lg=document.getElementById('league');
+    lg.innerHTML='<option value="">— all competitions —</option>'
+      + this.leagues().map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+    // default the filter to a picked team's league (e.g. after loading a saved sheet)
+    if(!this.league && this.cur.home) this.league=this.cur.home.league||'';
+    lg.value=this.league;
+    // Avoid a duplicate competition filter: when fixtures exist, the fixture picker
+    // selects the competition — so only show the manual Competition card as a fallback
+    // (no fixtures imported).
+    const hasFixtures=this.data.fixtures && this.data.fixtures.length>0;
+    document.getElementById('leagueCard').style.display = (anyLeagues && !hasFixtures) ? '' : 'none';
+    this.fillTeams('home'); this.fillTeams('away');
+    if(this.cur.home) document.getElementById('homeSelect').value=this.cur.home.teamId||'';
+    if(this.cur.away) document.getElementById('awaySelect').value=this.cur.away.teamId||'';
+  },
+  fillTeams(side){
+    const list = this.data.teams
+      .filter(t => !this.league || (t.league||'')===this.league)
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    document.getElementById(side+'Select').innerHTML =
+      '<option value="">— select team —</option>'
+      + list.map(t=>`<option value="${t.id}">${esc(t.name)} (${t.players.length})</option>`).join('');
+  },
+  pickLeague(league){
+    this.league = league;
+    this.fillTeams('home'); this.fillTeams('away');
+    // keep current team selected if it still belongs to the filtered list
+    if(this.cur.home) document.getElementById('homeSelect').value=this.cur.home.teamId||'';
+    if(this.cur.away) document.getElementById('awaySelect').value=this.cur.away.teamId||'';
+  },
+  pickTeam(side,teamId){
+    const t=this.data.teams.find(x=>x.id===teamId);
+    if(!t){ this.cur[side]=null; this.renderSide(side); return; }
+    // deep copy roster into the sheet so per-sheet number edits don't touch the master
+    this.cur[side]={
+      teamId:t.id, name:t.name, league:t.league||'',
+      roster:t.players.map(p=>({...p})),
+      xi:[], formation:"4-4-2", subs:[]
+    };
+    document.getElementById(side+'Name').innerHTML=crestImg(t.name,'crest-lg')+esc(t.name);
+    this.renderSide(side); this.touch();
+  },
+  renderSide(side){
+    const panel=document.getElementById(side+'Panel');
+    const s=this.cur[side];
+    if(!s){ panel.innerHTML='<div class="empty">Select a team above.</div>'; return; }
+    const benchIds=new Set(s.xi.map(x=>x.id));
+    const bench=s.roster.filter(p=>!benchIds.has(p.id));
+    panel.innerHTML=`
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h3>${crestImg(s.name,'crest-lg')}${esc(s.name)}</h3>
+        <div class="row">
+          <label style="align-self:center">Formation</label>
+          <select onchange="MS.setFormation('${side}',this.value)">
+            ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>1-${f}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="pitch" id="pitch-${side}">
+        <div class="line halfway"></div><div class="circle"></div>
+        <div class="box top"></div><div class="box bot"></div>
+      </div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="listcol">
+          <h3>Starting XI <span class="xi-count ${s.xi.length===11?'full':''}">${s.xi.length}/11</span></h3>
+          <div class="dropzone" id="xi-${side}" ondragover="MS.over(event)" ondragleave="MS.leave(event)" ondrop="MS.drop(event,'${side}','xi')">
+            ${s.xi.map(p=>this.playerHTML(side,p,'xi')).join('')||'<div class="empty">Tap players in the Squad to add them here</div>'}
+          </div>
+        </div>
+        <div class="listcol">
+          <h3>Squad <span class="xi-count">tap to add</span></h3>
+          <div class="dropzone" id="bench-${side}" ondragover="MS.over(event)" ondragleave="MS.leave(event)" ondrop="MS.drop(event,'${side}','bench')">
+            ${bench.map(p=>this.playerHTML(side,p,'bench')).join('')||'<div class="empty">All players are in the XI</div>'}
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Substitutions</h3>
+        <div id="subs-${side}">${s.subs.map((sub,i)=>this.subHTML(side,sub,i)).join('')}</div>
+        <button class="btn-ghost no-print" onclick="MS.addSub('${side}')" style="margin-top:6px">+ Substitution</button>
+      </div>`;
+    this.renderPitch(side);
+  },
+  playerHTML(side,p,zone){
+    // zone 'xi' → tapping removes; zone 'bench' → tapping adds. Drag still works on desktop.
+    const inXI = zone==='xi';
+    return `<div class="player ${inXI?'in-xi':''}" draggable="true"
+        ondragstart="MS.dragStart(event,'${side}','${p.id}')" ondragend="MS.dragEnd(event)"
+        onclick="MS.toggleXI('${side}','${p.id}')" title="${inXI?'Tap to remove from XI':'Tap to add to XI'}">
+      <span class="addbtn">${inXI?'−':'+'}</span>
+      <input class="pnum num" value="${p.num}" onclick="event.stopPropagation()"
+        onchange="MS.setNum('${side}','${p.id}',this.value)">
+      <span class="pname">${esc(p.name)}</span>
+      <span class="ppos">${esc(p.pos||'')}</span>
+    </div>`;
+  },
+  // Tap to add/remove from the starting XI — primary interaction (mobile-friendly).
+  toggleXI(side,pid){
+    const s=this.cur[side]; if(!s) return;
+    const inXI=s.xi.some(x=>x.id===pid);
+    if(inXI){ s.xi=s.xi.filter(x=>x.id!==pid); }
+    else{
+      if(s.xi.length>=11){ alert('Starting XI is full (11). Tap a selected player to remove one first.'); return; }
+      const p=s.roster.find(x=>x.id===pid); if(p) s.xi.push(p);
+    }
+    this.renderSide(side); this.touch();
+  },
+  subHTML(side,sub,i){
+    const s=this.cur[side];
+    const opt=(sel)=>s.roster.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
+    return `<div class="sub-row">
+      <input class="min" type="number" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
+      <span class="arrow" style="color:var(--red)">↓</span>
+      <select onchange="MS.setSub('${side}',${i},'off',this.value)"><option value="">off…</option>${opt(sub.off)}</select>
+      <span class="arrow" style="color:var(--green)">↑</span>
+      <select onchange="MS.setSub('${side}',${i},'on',this.value)"><option value="">on…</option>${opt(sub.on)}</select>
+      <button class="btn-danger no-print" onclick="MS.delSub('${side}',${i})">✕</button>
+    </div>`;
+  },
+  renderPitch(side){
+    const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
+    pitch.querySelectorAll('.spot').forEach(e=>e.remove());
+    const coords=FORMATIONS[s.formation];
+    s.xi.slice(0,11).forEach((p,i)=>{
+      const [x,y]=coords[i];
+      const d=document.createElement('div'); d.className='spot'; d.style.left=x+'%'; d.style.top=y+'%';
+      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl">${esc(lastName(p.name))}</div>`;
+      pitch.appendChild(d);
+    });
+  },
+  setFormation(side,f){ this.cur[side].formation=f; this.renderSide(side); this.touch(); },
+  setNum(side,pid,val){
+    const p=this.cur[side].roster.find(p=>p.id===pid); if(p){p.num=parseInt(val)||0;}
+    this.renderPitch(side); this.touch();
+  },
+
+  // drag & drop
+  _drag:null,
+  dragStart(e,side,pid){ this._drag={side,pid}; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; },
+  dragEnd(e){ e.target.classList.remove('dragging'); },
+  over(e){ e.preventDefault(); e.currentTarget.classList.add('over'); },
+  leave(e){ e.currentTarget.classList.remove('over'); },
+  drop(e,side,zone){
+    e.preventDefault(); e.currentTarget.classList.remove('over');
+    if(!this._drag||this._drag.side!==side) return; // no cross-team drops
+    const s=this.cur[side]; const pid=this._drag.pid;
+    const p=s.roster.find(x=>x.id===pid);
+    const inXI=s.xi.some(x=>x.id===pid);
+    if(zone==='xi' && !inXI){
+      if(s.xi.length>=11){ alert('Starting XI is full (11). Remove one first.'); return; }
+      s.xi.push(p);
+    } else if(zone==='bench' && inXI){
+      s.xi=s.xi.filter(x=>x.id!==pid);
+    }
+    this._drag=null; this.renderSide(side); this.touch();
+  },
+
+  // subs
+  addSub(side){ this.cur[side].subs.push({min:'',off:'',on:''}); this.renderSide(side); this.touch(); },
+  setSub(side,i,field,val){ this.cur[side].subs[i][field]= field==='min'?(parseInt(val)||''):val; this.touch(); },
+  delSub(side,i){ this.cur[side].subs.splice(i,1); this.renderSide(side); this.touch(); },
+
+  // ---------- save / load sheets ----------
+  // Build a snapshot object of the current in-progress sheet.
+  currentSheet(){
+    if(!this.cur.home && !this.cur.away) return null;
+    return {
+      id:this.curId||null,
+      date:document.getElementById('matchDate').value,
+      homeScore:document.getElementById('homeScore').value,
+      awayScore:document.getElementById('awayScore').value,
+      home:this.cur.home?JSON.parse(JSON.stringify(this.cur.home)):null,
+      away:this.cur.away?JSON.parse(JSON.stringify(this.cur.away)):null,
+      savedAt:new Date().toISOString()
+    };
+  },
+  touch(){
+    this._dirty=true;
+    // Auto-save the in-progress draft so nothing is lost if the tab closes.
+    try{ const d=this.currentSheet(); if(d) localStorage.setItem('scios_ms_draft', JSON.stringify(d)); }catch(e){}
+  },
+  restoreDraft(){
+    let d; try{ d=JSON.parse(localStorage.getItem('scios_ms_draft')||'null'); }catch(e){}
+    if(!d||(!d.home&&!d.away)) return false;
+    this.curId=d.id||null; this.cur.home=d.home||null; this.cur.away=d.away||null;
+    this.league=(d.home&&d.home.league)||'';
+    document.getElementById('matchDate').value=d.date||todayDDMMYYYY();
+    document.getElementById('homeScore').value=d.homeScore||0;
+    document.getElementById('awayScore').value=d.awayScore||0;
+    if(d.home) document.getElementById('homeName').innerHTML=crestImg(d.home.name,'crest-lg')+esc(d.home.name);
+    if(d.away) document.getElementById('awayName').innerHTML=crestImg(d.away.name,'crest-lg')+esc(d.away.name);
+    return true;
+  },
+  newSheet(){
+    if(this._dirty && !confirm('Start a new sheet? Unsaved changes will be lost.')) return;
+    this.cur={home:null,away:null}; this.curId=null; this._dirty=false;
+    localStorage.removeItem('scios_ms_draft');
+    document.getElementById('homeScore').value=0; document.getElementById('awayScore').value=0;
+    document.getElementById('matchDate').value=todayDDMMYYYY();
+    this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home');
+  },
+  saveSheet(){
+    if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
+    const sheet=this.currentSheet();
+    sheet.id=this.curId||crypto.randomUUID();
+    const idx=this.data.sheets.findIndex(s=>s.id===sheet.id);
+    if(idx>=0) this.data.sheets[idx]=sheet; else this.data.sheets.push(sheet);
+    this.curId=sheet.id; this._dirty=false; this.persist();
+    alert('Match sheet saved.');
+  },
+  loadSheet(id){
+    const s=this.data.sheets.find(x=>x.id===id); if(!s)return;
+    this.curId=s.id; this.cur.home=s.home; this.cur.away=s.away;
+    this.league=s.home.league||'';   // restore the competition filter from the saved sheet
+    document.getElementById('matchDate').value=s.date||'';
+    document.getElementById('homeScore').value=s.homeScore||0;
+    document.getElementById('awayScore').value=s.awayScore||0;
+    document.getElementById('homeName').innerHTML=crestImg(s.home.name,'crest-lg')+esc(s.home.name);
+    document.getElementById('awayName').innerHTML=crestImg(s.away.name,'crest-lg')+esc(s.away.name);
+    this.refreshSelects(); this.renderSide('home'); this.renderSide('away');
+    this._dirty=false; this.tab('build');
+  },
+  delSheet(id){
+    if(!confirm('Delete this saved sheet?'))return;
+    this.data.sheets=this.data.sheets.filter(s=>s.id!==id); this.persist(); this.renderSaved();
+  },
+  renderSaved(){
+    const root=document.getElementById('savedList');
+    const list=[...this.data.sheets].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
+    root.innerHTML=list.map(s=>`
+      <div class="saved-item">
+        ${crestImg(s.home.name,'crest')}
+        <div class="meta">
+          <b>${esc(s.home.name)} ${s.homeScore}–${s.awayScore} ${esc(s.away.name)}</b>
+          <small>${s.date||'no date'}</small>
+        </div>
+        ${crestImg(s.away.name,'crest')}
+        <button class="btn-ghost" onclick="MS.loadSheet('${s.id}')">Open</button>
+        <button class="btn-danger" onclick="MS.delSheet('${s.id}')">Delete</button>
+      </div>`).join('') || '<div class="empty">No saved sheets yet. Build one and press Save.</div>';
+  },
+
+  // ---------- export ----------
+  sheetTitle(){
+    const h=this.cur.home?this.cur.home.name:'Home';
+    const a=this.cur.away?this.cur.away.name:'Away';
+    const d=(document.getElementById('matchDate').value||'').replace(/\//g,'-');
+    return `${h} vs ${a}${d?' '+d:''}`;
+  },
+  // Collect any issues with the current sheet (used to warn before exporting/sharing).
+  validate(){
+    const issues=[];
+    ['home','away'].forEach(side=>{
+      const s=this.cur[side]; const which=side==='home'?'Home':'Away';
+      if(!s){ issues.push(`${which} team not selected`); return; }
+      if(s.xi.length!==11) issues.push(`${which} (${s.name}) has ${s.xi.length}/11 in the XI`);
+      (s.subs||[]).forEach((sub,i)=>{
+        if((sub.on&&!sub.off)||(sub.off&&!sub.on)) issues.push(`${which} substitution ${i+1} is incomplete`);
+      });
+    });
+    return issues;
+  },
+  confirmIfInvalid(action){
+    const issues=this.validate();
+    if(!issues.length) return true;
+    return confirm(`Before you ${action}:\n\n• ${issues.join('\n• ')}\n\nContinue anyway?`);
+  },
+  exportPDF(){
+    if(!this.confirmIfInvalid('export the PDF')) return;
+    if(!this.cur.home||!this.cur.away){
+      if(!confirm('Both teams are not selected yet. Export anyway?')) return;
+    }
+    // The PDF filename comes from document.title in the print dialog — set it so the
+    // saved file is "Home vs Away DD-MM-YYYY.pdf", ready to send on WhatsApp.
+    const prev=document.title;
+    document.title=this.sheetTitle();
+    window.print();
+    setTimeout(()=>{ document.title=prev; }, 800);
+  },
+
+  // A plain-text summary of the sheet — handy to paste/share in WhatsApp.
+  sheetText(){
+    const line=(s)=>{
+      if(!s) return '';
+      const xi=s.xi.map(p=>`${p.num} ${p.name}`).join('\n');
+      const subs=(s.subs||[]).filter(x=>x.on||x.off)
+        .map(x=>`${x.min||'?'}' ${x.off?'OUT '+(s.roster.find(p=>p.id===x.off)||{}).name:''}${x.on?' / IN '+(s.roster.find(p=>p.id===x.on)||{}).name:''}`)
+        .join('\n');
+      return `*${s.name}* (1-${s.formation})\n${xi}${subs?'\nSubs:\n'+subs:''}`;
+    };
+    const d=document.getElementById('matchDate').value;
+    const hs=document.getElementById('homeScore').value, as=document.getElementById('awayScore').value;
+    return `⚽ ${this.cur.home?this.cur.home.name:'Home'} ${hs}–${as} ${this.cur.away?this.cur.away.name:'Away'}`
+      + (d?`\n📅 ${d}`:'') + `\n\n${line(this.cur.home)}\n\n${line(this.cur.away)}\n\n— SCIOS Match Sheet`;
+  },
+  // One-tap share on mobile (Web Share API → WhatsApp, email, etc.); falls back to copy.
+  async share(){
+    if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
+    if(!this.confirmIfInvalid('share')) return;
+    const text=this.sheetText();
+    if(navigator.share){
+      try{ await navigator.share({title:this.sheetTitle(), text}); return; }catch(e){ if(e&&e.name==='AbortError') return; }
+    }
+    // Fallback: copy to clipboard so they can paste into WhatsApp
+    try{ await navigator.clipboard.writeText(text); alert('Match sheet copied — paste it into WhatsApp.'); }
+    catch(e){ prompt('Copy the match sheet text:', text); }
+  },
+
+  // Export the lineup as JSON matching the SCIOS platform's GET /fixtures/:id/lineup
+  // response shape (LineupResponse), so the App's match-analysis formation can ingest it.
+  sciosLineup(){
+    const sideObj=(s)=>{
+      if(!s) return {team_id:'', team_name:'', starters:[], subs:[]};
+      const subbedOff={}, subbedOn={};
+      (s.subs||[]).forEach(sub=>{ if(sub.off) subbedOff[sub.off]=sub.min||null; if(sub.on) subbedOn[sub.on]=sub.min||null; });
+      const mk=(p,posAbbr)=>({
+        player_id: p.srcId||'',                 // SciSports/source id from the imported sheet
+        platform_player_id: null,
+        player_name: p.name,
+        position: '',                            // nominal position not tracked here
+        position_abbr: posAbbr||'',
+        shirt_number: (p.num??null),
+        subbed_on_minute: (subbedOn[p.id]??null),
+        subbed_off_minute: (subbedOff[p.id]??null),
+        player_image_url: null
+      });
+      const starters=s.xi.map((p,i)=>mk(p, POSN[i]||''));
+      const startIds=new Set(s.xi.map(p=>p.id));
+      // anyone brought on as a sub who isn't a starter counts as a sub
+      const subPlayers=s.roster.filter(p=>!startIds.has(p.id) && subbedOn[p.id]!==undefined).map(p=>mk(p,''));
+      return { team_id:s.teamId||'', team_name:s.name, formation:'1-'+s.formation, starters, subs:subPlayers };
+    };
+    return {
+      // wrapper metadata so the importer can match the fixture; the platform's
+      // LineupResponse core (home_team/away_team) is nested verbatim.
+      meta:{
+        date: document.getElementById('matchDate').value||'',
+        home_score: +document.getElementById('homeScore').value||0,
+        away_score: +document.getElementById('awayScore').value||0,
+        competition: this.cur.home?this.cur.home.league:'',
+        source:'scios-match-sheet', version:1
+      },
+      home_team: sideObj(this.cur.home),
+      away_team: sideObj(this.cur.away)
+    };
+  },
+  exportSCIOS(){
+    if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
+    if(!this.confirmIfInvalid('export for SCIOS')) return;
+    const json=JSON.stringify(this.sciosLineup(), null, 2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=this.sheetTitle().replace(/\s+/g,'_')+'_SCIOS.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  },
+
+  // ---------- admin gate ----------
+  ADMIN_CODE:'scios2026',   // change to your chosen passcode
+  isAdmin:false,
+  toggleAdmin(){
+    if(this.isAdmin){ this.setAdmin(false); return; }
+    const code=prompt('Enter admin passcode to enable importing & clearing data:');
+    if(code===null) return;
+    if(code===this.ADMIN_CODE){ this.setAdmin(true); }
+    else alert('Incorrect passcode.');
+  },
+  setAdmin(on){
+    this.isAdmin=on;
+    sessionStorage.setItem('scios_ms_admin', on?'1':'');
+    document.getElementById('adminTools').style.display = on ? '' : 'none';
+    document.getElementById('adminBtn').textContent = on ? '🔓 Admin (on)' : '🔒 Admin';
+    document.getElementById('adminHint').style.display = on ? 'none' : '';
+  },
+  requireAdmin(){
+    if(this.isAdmin) return true;
+    alert('Admin only. Tap "🔒 Admin" and enter the passcode to import or clear data.');
+    return false;
+  },
+
+  // ---------- theme ----------
+  applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    const btn=document.getElementById('themeBtn');
+    if(btn) btn.textContent = t==='light' ? '☀️' : '🌙';
+    // dark logo in dark mode; bright logo in light mode (per user preference)
+    const logo=document.getElementById('brandLogo');
+    if(logo) logo.src = t==='light' ? 'logos/Logo-scios-bright.png' : 'logos/Logo-scios-dark.png';
+    localStorage.setItem('scios_ms_theme', t);
+  },
+  toggleTheme(){
+    const cur=document.documentElement.getAttribute('data-theme')||'dark';
+    this.applyTheme(cur==='dark'?'light':'dark');
+  },
+
+  init(){
+    this.applyTheme(localStorage.getItem('scios_ms_theme')||'dark');
+    this.setAdmin(sessionStorage.getItem('scios_ms_admin')==='1');
+    this.load(); this.refreshSelects(); this.refreshFixturePicker();
+    document.getElementById('matchDate').value=todayDDMMYYYY();
+    // Restore any auto-saved draft so closing the tab never loses work.
+    const restored=this.restoreDraft();
+    if(restored){ this.refreshSelects(); }
+    this.renderSide('home'); this.renderSide('away'); this.showTeam('home');
+    if(restored){
+      const b=document.getElementById('draftNote');
+      if(b) b.style.display='';
+    }
+  }
+};
+function parseCSV(text){
+  // RFC-4180-ish: handles quoted fields, escaped quotes (""), commas & newlines in quotes
+  text=text.replace(/^﻿/,''); // strip BOM
+  const rows=[]; let row=[], field='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){
+      if(ch==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; }
+      else field+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===',') { row.push(field); field=''; }
+      else if(ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(ch==='\r'){ /* ignore */ }
+      else field+=ch;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function normDate(d){
+  // normalise any input to DD/MM/YYYY (the display + storage format)
+  if(!d) return '';
+  let m=d.match(/^(\d{4})-(\d{2})-(\d{2})/);              // ISO YYYY-MM-DD
+  if(m){ const [,yy,mm,dd]=m; return `${dd}/${mm}/${yy}`; }
+  m=d.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);      // DD-MM-YYYY or DD/MM/YYYY
+  if(m){ const [,dd,mm,yy]=m; return `${dd.padStart(2,'0')}/${mm.padStart(2,'0')}/${yy}`; }
+  return d; // leave anything unexpected as-is
+}
+function todayDDMMYYYY(){
+  const d=new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function lastName(n){const p=String(n||'').trim().split(' ');return p[p.length-1];}
+
+// ---- team logos ----
+// Known logo files in logos/ (base names, .png). Used to resolve a team → crest.
+const LOGO_FILES=["AEK","AEL","AEZ","APEA","APOEL","ASIL","Achyronas","Anorthosis","Apollon","Aris","Armenia","Ayia Napa","Chalkanoras","Cyprus","Digenis","Doxa","ENP","Ethnikos Achnas","Ethnikos Assias","Ethnikos Latsion","Finland","Iraklis","Karmiotissa","Kazakhstan","Kosovo","Lithuania","MEAP","Nea Salamina","Netherlands","North Macedonia","Northern Ireland","Olympiakos","Omonoia 29M","Omonoia","PAEEK","Pafos","Republic of Ireland","Romania","San Marino","Spain","Spartakos"];
+// Spelling variants in team data → logo file base name.
+const LOGO_ALIASES={"omonia":"Omonoia","omonia nicosia":"Omonoia","omonoia nicosia":"Omonoia","omonia aradippou":"Omonoia 29M","ethnikos":"Ethnikos Achnas"};
+const _logoLower={}; LOGO_FILES.forEach(f=>_logoLower[f.toLowerCase()]=f);
+function teamLogo(name){
+  if(!name) return null;
+  // strip age suffix (U14..U21) and extra whitespace
+  let base=String(name).replace(/\bU\d{2}\b/gi,'').replace(/\s+/g,' ').trim();
+  const key=base.toLowerCase();
+  if(LOGO_ALIASES[key]) return 'logos/'+LOGO_ALIASES[key]+'.png';
+  if(_logoLower[key]) return 'logos/'+_logoLower[key]+'.png';
+  // try first word (e.g. "Apollon Limassol" → "Apollon")
+  const first=key.split(' ')[0];
+  if(LOGO_ALIASES[first]) return 'logos/'+LOGO_ALIASES[first]+'.png';
+  if(_logoLower[first]) return 'logos/'+_logoLower[first]+'.png';
+  return null;
+}
+// crest <img> with graceful hide if the file is missing
+function crestImg(name, cls){
+  const src=teamLogo(name);
+  if(!src) return '';
+  return `<img class="${cls||'crest'}" src="${src}" alt="" onerror="this.style.display='none'">`;
+}
+MS.init();
+</script>
+</body>
+</html>
