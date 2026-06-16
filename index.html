@@ -291,6 +291,7 @@
   </section>
 </main>
 
+<script src="data.js"></script>
 <script>
 const FORMATIONS = {
   "4-4-2":   [[50,92],[18,74],[39,76],[61,76],[82,74],[16,50],[39,52],[61,52],[84,50],[38,26],[62,26]],
@@ -311,11 +312,19 @@ const MS = {
 
   // ---------- persistence ----------
   load(){
-    try{ this.data = JSON.parse(localStorage.getItem('scios_ms')||'') || this.data; }catch(e){}
+    let saved=null;
+    try{ saved = JSON.parse(localStorage.getItem('scios_ms')||'null'); }catch(e){}
+    if(saved){ this.data = saved; }
     if(!this.data.fixtures) this.data.fixtures=[];
     if(!this.data.teams) this.data.teams=[];
     if(!this.data.sheets) this.data.sheets=[];
-    // No seed data — the tool starts empty until players/fixtures are imported (admin).
+    // Pre-load bundled default data (teams + fixtures) so the tool works for
+    // everyone with no import. Only used on first visit (when nothing is saved yet).
+    if(this.data.teams.length===0 && window.SCIOS_DATA && window.SCIOS_DATA.teams){
+      this.data.teams = window.SCIOS_DATA.teams;
+      this.data.fixtures = window.SCIOS_DATA.fixtures || [];
+      this.persist();
+    }
   },
   persist(){ localStorage.setItem('scios_ms', JSON.stringify(this.data)); },
 
