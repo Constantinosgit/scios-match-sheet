@@ -315,19 +315,9 @@ const MS = {
     if(!this.data.fixtures) this.data.fixtures=[];
     if(!this.data.teams) this.data.teams=[];
     if(!this.data.sheets) this.data.sheets=[];
-    if(this.data.teams.length===0) this.seed();
+    // No seed data — the tool starts empty until players/fixtures are imported (admin).
   },
   persist(){ localStorage.setItem('scios_ms', JSON.stringify(this.data)); },
-  seed(){
-    // a few Cyprus teams to start; fully editable
-    const mk=(name,players)=>({id:crypto.randomUUID(),name,players:players.map((p,i)=>({id:crypto.randomUUID(),num:i+1,name:p,pos:''}))});
-    this.data.teams=[
-      mk("Omonia Nicosia",["Fabiano","Lewis","Diomande","Bruno","Panayiotou","Loizou","Bezus","Semedo","Charalambous","Neophytou","Yuste"]),
-      mk("APOEL",["Belec","Tomovic","Savic","Roberge","Pileas","Donis","Yfantidis","Kvilitaia","Pons","Al Taamari","Ioannou"]),
-      mk("Anorthosis",["Loria","Sergiou","Risvanis","Stoppila","Lang","Warda","Kyriakou","Correia","Ioannou","Spoljaric","Squilacci"])
-    ];
-    this.persist();
-  },
 
   // ---------- tabs ----------
   tab(name){
@@ -607,7 +597,7 @@ const MS = {
               <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
             </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
         </div>
-      </div>`).join('') || '<div class="empty">No teams yet. Add one above.</div>';
+      </div>`).join('') || '<div class="empty">No teams yet. Tap <b>🔒 Admin</b> → enter the passcode → <b>Import players (CSV)</b> to load all teams, or <b>Add team</b> manually.</div>';
   },
 
   // ---------- match sheet build ----------
