@@ -735,7 +735,37 @@ const MS = {
       xi:[], formation:"4-4-2", subs:[]
     };
     document.getElementById(side+'Name').innerHTML=crestImg(t.name,'crest-lg')+esc(t.name);
+    // Offer the team's last saved lineup as a template (XI + formation + numbers).
+    this.offerTemplate(side, t);
     this.renderSide(side); this.touch();
+  },
+  // Find this team's most recent saved sheet and offer to reuse its lineup.
+  lastSavedFor(teamName){
+    const matches=[];
+    (this.data.sheets||[]).forEach(sh=>{
+      if(sh.home && sh.home.name===teamName) matches.push({sh, t:sh.home});
+      if(sh.away && sh.away.name===teamName) matches.push({sh, t:sh.away});
+    });
+    if(!matches.length) return null;
+    matches.sort((a,b)=>(b.sh.savedAt||'').localeCompare(a.sh.savedAt||''));
+    return {team:matches[0].t, date:matches[0].sh.date};
+  },
+  offerTemplate(side, team){
+    const last=this.lastSavedFor(team.name);
+    if(!last || !last.team.xi || !last.team.xi.length) return;
+    const opp = last.date ? ` (last used ${last.date})` : '';
+    if(!confirm(`Load ${team.name}'s last lineup as a template?${opp}\n\n`
+      + `Formation ${fmtFormation(last.team.formation)}, ${last.team.xi.length} players — `
+      + `you can then edit it. Cancel to start with an empty XI.`)) return;
+    const cur=this.cur[side];
+    const byId=new Map(cur.roster.map(p=>[p.id,p]));
+    // re-apply saved shirt numbers + XI order to the current roster (matched by player id)
+    last.team.xi.forEach(saved=>{
+      const p=byId.get(saved.id); if(p && saved.num!=null) p.num=saved.num;
+    });
+    cur.xi = last.team.xi.map(saved=>byId.get(saved.id)).filter(Boolean);
+    cur.formation = last.team.formation || cur.formation;
+    cur.subs = []; // subs are match-specific, don't carry over
   },
   renderSide(side){
     const panel=document.getElementById(side+'Panel');
