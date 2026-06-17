@@ -1060,12 +1060,18 @@ const MS = {
       if(!confirm('Both teams are not selected yet. Export anyway?')) return;
     }
     this.buildPrintSheet();
-    // One-time tip: the browser adds a date/URL header & footer — show how to remove it.
-    if(!localStorage.getItem('scios_ms_printtip')){
-      localStorage.setItem('scios_ms_printtip','1');
-      alert('Tip: in the print dialog, open "More settings" and UNCHECK "Headers and footers" '
-        + 'to remove the date/URL from the page. The browser remembers this for next time.\n\n'
-        + 'Also tick "Background graphics" so the pitch prints green.');
+    // The browser (not this tool) stamps a date/URL header & footer on printouts — it can
+    // only be removed via the print dialog. Show a clear how-to until the user dismisses it
+    // with "Got it" (then we stop showing it).
+    if(localStorage.getItem('scios_ms_printtip')!=='done'){
+      const ok=confirm(
+        'BEFORE YOU SAVE THE PDF — two quick print settings:\n\n'
+        + '1)  Open "More settings" in the print window.\n'
+        + '2)  UNCHECK  "Headers and footers"   → removes the date/URL at the top & bottom.\n'
+        + '3)  CHECK  "Background graphics"      → makes the pitch print green.\n\n'
+        + 'The browser remembers these for next time.\n\n'
+        + 'Press OK if you\'ve seen this (won\'t show again) — or Cancel to keep the reminder.');
+      if(ok) localStorage.setItem('scios_ms_printtip','done');
     }
     // The PDF filename comes from document.title in the print dialog — set it so the
     // saved file is "Home vs Away DD-MM-YYYY.pdf", ready to send on WhatsApp.

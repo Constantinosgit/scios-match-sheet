@@ -4,6 +4,15 @@ A standalone, single-file web tool to build football match sheets — pick a fix
 
 **One file, no build, no dependencies.** Everything lives in `index.html`. Open it by double-clicking, or host it at a URL — both work identically. All data is stored in the browser (localStorage), so it works fully offline.
 
+## Exporting a clean PDF
+
+The browser (not this tool) adds a date/URL header & footer to printouts — it **cannot** be removed by code, only via the print dialog. To get a clean sheet, in the print window:
+- Open **"More settings"**
+- **Uncheck "Headers and footers"** → removes the date/URL at the top & bottom
+- **Check "Background graphics"** → makes the pitch print green
+
+The browser remembers both settings for next time. (The tool shows a one-time reminder of this when you first export.)
+
 ## Using it
 
 1. **Teams & Rosters tab** (admin only — see below):
