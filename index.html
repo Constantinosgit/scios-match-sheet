@@ -36,6 +36,11 @@
   .datewrap{position:relative;display:inline-block}
   .datewrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;
     border:none;padding:0;margin:0;cursor:pointer;min-height:0}
+  /* compact match strip — hidden on desktop (editor always shown); shown on mobile */
+  .matchstrip{display:none;width:100%;align-items:center;gap:8px;background:transparent;
+    color:var(--text);border:none;padding:4px;font-size:16px;font-weight:600;min-height:auto}
+  .matchstrip .strip-edit{margin-left:auto;color:var(--accent)}
+  .matchstrip .crest{width:20px;height:20px}
 
   /* Home/Away toggle */
   .teamtoggle{display:flex;gap:8px;margin-bottom:12px}
@@ -147,11 +152,20 @@
     .tabs{padding:8px 10px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
     .tab{white-space:nowrap;font-size:15px}
 
-    /* matchbar stacks: home, score, away each full width */
+    /* compact match strip: show it; collapse the full editor unless opened */
+    .matchstrip{display:flex}
+    .matchcard .matchbar{display:none}
+    .matchcard.editor-open .matchbar{display:grid;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+
+    /* matchbar stacks: home, score, away each full width (when open) */
     .matchbar{grid-template-columns:1fr;gap:14px}
     .matchbar .vs{display:none}
     .score{justify-content:flex-start}
     .score input{width:64px;font-size:24px}
+
+    /* panel header smaller on mobile (team name already in the strip above) */
+    .teampanel h3{font-size:15px}
+    .teampanel h3 .crest-lg{width:22px;height:22px}
 
     /* XI + Squad stack vertically, full width */
     .grid2{grid-template-columns:1fr;gap:14px}
@@ -268,8 +282,13 @@
       <select id="league" onchange="MS.pickLeague(this.value)" style="width:100%;margin-top:4px"></select>
       <div class="hint">Or pick the competition manually — both team lists below filter to it.</div>
     </div>
-    <div class="card">
-      <div class="matchbar">
+    <!-- Compact match strip: one-line summary (teams · score · date). Tap to expand the editor. -->
+    <div class="card matchcard">
+      <button class="matchstrip no-print" onclick="MS.toggleMatchEditor()">
+        <span id="stripText">Select teams to start</span>
+        <span class="strip-edit">✎</span>
+      </button>
+      <div class="matchbar" id="matchEditor">
         <div>
           <label>Home team</label>
           <select id="homeSelect" onchange="MS.pickTeam('home',this.value)" style="width:100%"></select>
@@ -373,6 +392,13 @@ const FORMATIONS = {
   "4-5-1":      {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[14,50],[34,52],[50,54],[66,52],[86,50],[50,22]],
                  pos:["GK","LB","LCB","RCB","RB","LW","LCM","DMF","RCM","RW","ST"]}
 };
+// All position codes used across the formations, grouped for the rosters dropdown.
+const POSITION_OPTIONS = [
+  {group:"Goalkeeper", codes:["GK"]},
+  {group:"Defence",    codes:["LB","RB","LWB","RWB","LCB","CCB","RCB","LCD","CCD","RCD"]},
+  {group:"Midfield",   codes:["CDM","DM","DMF","LDM","RDM","LCM","RCM","AM"]},
+  {group:"Attack",     codes:["LW","RW","LS","RS","ST"]}
+];
 
 const MS = {
   data:{teams:[], sheets:[], fixtures:[]},
@@ -618,7 +644,7 @@ const MS = {
     const missing=[];
     if(ht){ this.pickTeam('home', ht.id); document.getElementById('homeSelect').value=ht.id; } else missing.push(f.home);
     if(at){ this.pickTeam('away', at.id); document.getElementById('awaySelect').value=at.id; } else missing.push(f.away);
-    if(f.date) document.getElementById('matchDate').value=f.date;
+    if(f.date) document.getElementById('matchDate').value=normDate(f.date);
     this.touch();
     const st=document.getElementById('fixPickStatus');
     if(missing.length){ st.style.color='var(--amber)';
@@ -669,9 +695,9 @@ const MS = {
         <div style="margin-top:10px">
           ${t.players.map(p=>`
             <div class="player" style="cursor:default">
-              <input class="num" type="number" value="${p.num}" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
+              <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
               <input class="pname" style="flex:1" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
-              <input style="width:70px" placeholder="POS" value="${esc(p.pos)}" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">
+              <select style="width:84px" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
               <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
             </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
         </div>
@@ -686,6 +712,20 @@ const MS = {
     document.getElementById('awayPanel').classList.toggle('hidden-screen', side!=='away');
     document.getElementById('tgHome').classList.toggle('active', side==='home');
     document.getElementById('tgAway').classList.toggle('active', side==='away');
+  },
+  // Compact match strip (mobile): toggle the editor open/closed.
+  toggleMatchEditor(){
+    document.querySelector('.matchcard').classList.toggle('editor-open');
+  },
+  // Keep the one-line summary in sync with teams/score/date.
+  updateStrip(){
+    const h=this.cur.home?this.cur.home.name:'Home', a=this.cur.away?this.cur.away.name:'Away';
+    const hs=document.getElementById('homeScore').value||0, as=document.getElementById('awayScore').value||0;
+    const d=document.getElementById('matchDate').value||'';
+    const el=document.getElementById('stripText');
+    if(el) el.innerHTML=(this.cur.home||this.cur.away)
+      ? `${crestImg(h,'crest')} <b>${esc(h)}</b> ${hs}–${as} <b>${esc(a)}</b> ${crestImg(a,'crest')}${d?` · ${esc(d)}`:''}`
+      : 'Select teams to start';
   },
   leagues(){
     // distinct, sorted league names (blank league grouped as "Other")
@@ -823,13 +863,23 @@ const MS = {
     </div>`;
   },
   // Tap to add/remove from the starting XI — primary interaction (mobile-friendly).
+  // When adding, drop the player into the formation slot matching his DEFAULT position
+  // (if that slot is still free) so the pitch lines up with players' natural positions.
   toggleXI(side,pid){
     const s=this.cur[side]; if(!s) return;
     const inXI=s.xi.some(x=>x.id===pid);
     if(inXI){ s.xi=s.xi.filter(x=>x.id!==pid); }
     else{
       if(s.xi.length>=11){ alert('Starting XI is full (11). Tap a selected player to remove one first.'); return; }
-      const p=s.roster.find(x=>x.id===pid); if(p) s.xi.push(p);
+      const p=s.roster.find(x=>x.id===pid); if(!p) return;
+      // Insert so the XI stays in formation order: find the player's natural slot index,
+      // then place him among the already-picked players keeping slot order (dense array).
+      const f=FORMATIONS[s.formation]||{pos:[]};
+      const slotOf=(pl)=>{ const idx=pl.pos?f.pos.indexOf(pl.pos):-1; return idx<0?99:idx; };
+      const mySlot=slotOf(p);
+      let at=s.xi.length;
+      for(let i=0;i<s.xi.length;i++){ if(slotOf(s.xi[i])>mySlot){ at=i; break; } }
+      s.xi.splice(at,0,p);
     }
     this.renderSide(side); this.touch();
   },
@@ -947,6 +997,7 @@ const MS = {
   },
   touch(){
     this._dirty=true;
+    this.updateStrip();
     // Auto-save the in-progress draft so nothing is lost if the tab closes.
     try{ const d=this.currentSheet(); if(d) localStorage.setItem('scios_ms_draft', JSON.stringify(d)); }catch(e){}
   },
@@ -955,7 +1006,7 @@ const MS = {
     if(!d||(!d.home&&!d.away)) return false;
     this.curId=d.id||null; this.cur.home=d.home||null; this.cur.away=d.away||null;
     this.league=(d.home&&d.home.league)||'';
-    document.getElementById('matchDate').value=d.date||todayDDMMYYYY();
+    document.getElementById('matchDate').value=normDate(d.date)||todayDDMMYYYY();
     document.getElementById('homeScore').value=d.homeScore||0;
     document.getElementById('awayScore').value=d.awayScore||0;
     if(d.home) document.getElementById('homeName').innerHTML=crestImg(d.home.name,'crest-lg')+esc(d.home.name);
@@ -968,7 +1019,7 @@ const MS = {
     localStorage.removeItem('scios_ms_draft');
     document.getElementById('homeScore').value=0; document.getElementById('awayScore').value=0;
     document.getElementById('matchDate').value=todayDDMMYYYY();
-    this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home');
+    this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
   },
   saveSheet(){
     if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
@@ -983,7 +1034,7 @@ const MS = {
     const s=this.data.sheets.find(x=>x.id===id); if(!s)return;
     this.curId=s.id; this.cur.home=s.home; this.cur.away=s.away;
     this.league=s.home.league||'';   // restore the competition filter from the saved sheet
-    document.getElementById('matchDate').value=s.date||'';
+    document.getElementById('matchDate').value=normDate(s.date||'');
     document.getElementById('homeScore').value=s.homeScore||0;
     document.getElementById('awayScore').value=s.awayScore||0;
     document.getElementById('homeName').innerHTML=crestImg(s.home.name,'crest-lg')+esc(s.home.name);
@@ -1265,7 +1316,7 @@ const MS = {
     // Restore any auto-saved draft so closing the tab never loses work.
     const restored=this.restoreDraft();
     if(restored){ this.refreshSelects(); }
-    this.renderSide('home'); this.renderSide('away'); this.showTeam('home');
+    this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
     if(restored){
       const b=document.getElementById('draftNote');
       if(b) b.style.display='';
@@ -1309,6 +1360,16 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function lastName(n){const p=String(n||'').trim().split(' ');return p[p.length-1];}
 // "4-4-2" → "1-4-4-2"; "3-5-2 (DM)" → "1-3-5-2 (DM)"
 function fmtFormation(f){ return String(f||'').replace(/^(\d)/,'1-$1'); }
+// <option> list for the rosters position dropdown, grouped, with `sel` pre-selected.
+function posOptionsHTML(sel){
+  let h='<option value="">—</option>';
+  POSITION_OPTIONS.forEach(g=>{
+    h+=`<optgroup label="${g.group}">`
+      + g.codes.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}</option>`).join('')
+      + '</optgroup>';
+  });
+  return h;
+}
 
 // ---- team logos ----
 // Known logo files in logos/ (base names, .png). Used to resolve a team → crest.
