@@ -32,6 +32,10 @@
   input:focus,select:focus{border-color:var(--accent)}
   input.num{width:52px;text-align:center;padding:8px 4px}
   label{color:var(--text2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  /* date: visible DD/MM/YYYY text with the native calendar input overlaid invisibly */
+  .datewrap{position:relative;display:inline-block}
+  .datewrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;
+    border:none;padding:0;margin:0;cursor:pointer;min-height:0}
 
   /* Home/Away toggle */
   .teamtoggle{display:flex;gap:8px;margin-bottom:12px}
@@ -97,16 +101,19 @@
   .pitch .box{position:absolute;left:50%;transform:translateX(-50%);
     width:50%;height:16%;border:2px solid rgba(255,255,255,.55)}
   .pitch .box.top{top:0;border-top:none}.pitch .box.bot{bottom:0;border-bottom:none}
-  .spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:64px}
+  .spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:64px;cursor:pointer}
   .spot .dot{width:34px;height:34px;margin:0 auto;border-radius:50%;
     background:linear-gradient(160deg,#0b2f6b,#1f4ed8);
     color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;
-    border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+    border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);transition:transform .1s}
+  .spot.sel .dot{background:var(--amber);transform:scale(1.18);border-color:#fff;
+    box-shadow:0 0 0 3px var(--amber),0 2px 8px rgba(0,0,0,.6)}
+  .spot:active .dot{transform:scale(1.1)}
   .spot .lbl{font-size:10px;margin-top:2px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* brand logo in header */
-  .brand-logo{height:30px;width:auto;display:block}
+  .brand-logo{height:44px;width:auto;display:block}
   .logo-sub{font-weight:700;font-size:14px;color:var(--text2);letter-spacing:.02em;
     padding-left:10px;margin-left:6px;border-left:1px solid var(--border)}
 
@@ -133,7 +140,7 @@
     main{padding:12px}
     .card{padding:13px;margin-bottom:12px}
     header.app{padding:10px 12px;gap:8px;flex-wrap:wrap}
-    .brand-logo{height:26px}
+    .brand-logo{height:34px}
     .logo-sub{margin-left:auto;border-left:none;padding-left:0}  /* push subtitle right */
     header.app .spacer{display:none}
     header.app button{flex:1 1 28%;padding:11px 6px;font-size:13px;min-width:0}
@@ -165,18 +172,60 @@
   }
 
   /* print */
+  /* Screen: the print sheet is hidden */
+  #printSheet{display:none}
+
+  /* Screen: the print sheet is hidden */
+
   @media print{
-    .teamtoggle{display:none!important}
-    .teampanel.hidden-screen{display:block!important}  /* both teams print */
-    .addbtn{display:none!important}
-    body{background:#fff;color:#000}
-    header.app,.tabs,.no-print{display:none!important}
-    main{max-width:none;padding:0}
-    .card{border:1px solid #ccc;box-shadow:none;page-break-inside:avoid}
-    .pitch{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .spot .dot{background:#1f4ed8 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .brand-logo{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @page{size:A4 portrait;margin:10mm 9mm}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{background:#fff;color:#111}
+    /* hide ALL the app UI; show only the dedicated print sheet */
+    header.app,.tabs,main,.no-print{display:none!important}
+    #printSheet{display:block!important}
+
+    .ps-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0A1628;padding-bottom:6px;margin-bottom:10px}
+    .ps-logo{height:48px;width:auto}
+    .ps-score{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
+    .ps-score .ps-hn,.ps-score .ps-an{font-size:16px}
+    .ps-score .ps-sc{font-size:22px;color:#1f4ed8}
+    .ps-date{font-size:13px;font-weight:700;color:#3A5070}
+
+    /* Portrait split into 2 columns: Home (left) | Away (right) */
+    .ps-body{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ps-team{border:1px solid #C8D4EC;border-radius:8px;padding:10px;break-inside:avoid;display:flex;flex-direction:column}
+    .ps-tname{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:800;margin-bottom:8px}
+    .ps-tname .ps-form{margin-left:auto;font-size:12px;font-weight:700;color:#1f4ed8}
+    .ps-tname .crest-lg{width:24px;height:24px}
+
+    /* Within each team, stacked vertically: pitch (top) → lineup → subs */
+    .ps-pitch{position:relative;height:330px;border:1.5px solid rgba(255,255,255,.7);border-radius:6px;
+      background:repeating-linear-gradient(0deg,#3a9a4e 0 12.5%,#359045 12.5% 25%);margin-bottom:8px;overflow:hidden}
+    /* pitch markings for the printed sheet */
+    .ps-halfway{position:absolute;left:0;right:0;top:50%;height:1.5px;background:rgba(255,255,255,.7)}
+    .ps-circle{position:absolute;left:50%;top:50%;width:24%;aspect-ratio:1;transform:translate(-50%,-50%);
+      border:1.5px solid rgba(255,255,255,.7);border-radius:50%}
+    .ps-box{position:absolute;left:50%;transform:translateX(-50%);width:46%;height:15%;
+      border:1.5px solid rgba(255,255,255,.7)}
+    .ps-box-top{top:0;border-top:none}.ps-box-bot{bottom:0;border-bottom:none}
+    .ps-spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:50px;z-index:2}
+    .ps-dot{display:flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 auto;
+      border-radius:50%;background:#1f4ed8;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
+    .ps-lbl{font-size:8.5px;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis;display:block}
+
+    .ps-xi{font-size:11.5px}
+    .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
+    .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8}
+    .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070}
+    .ps-subs{margin-top:6px;border-top:1px dashed #C8D4EC;padding-top:5px;font-size:11px}
+    .ps-subs-h{font-weight:700;text-transform:uppercase;font-size:10px;color:#3A5070;margin-bottom:3px}
+    .ps-sub{padding:1px 0}
+    .ps-foot{margin-top:8px;text-align:center;font-size:10px;color:#7A90B0}
+    .crest,.crest-lg{display:inline-block}
   }
+  #printSheet{display:none}
 </style>
 </head>
 <body>
@@ -228,8 +277,13 @@
         </div>
         <div>
           <div class="vs">DATE</div>
-          <input type="text" id="matchDate" placeholder="DD/MM/YYYY" inputmode="numeric"
-                 pattern="\d{2}/\d{2}/\d{4}" style="width:120px;text-align:center" onchange="MS.touch()" />
+          <div class="datewrap">
+            <!-- visible DD/MM/YYYY display; hidden native date input provides the calendar -->
+            <input type="text" id="matchDate" placeholder="DD/MM/YYYY" inputmode="numeric"
+                   pattern="\d{2}/\d{2}/\d{4}" readonly onclick="MS.openDate()"
+                   style="width:130px;text-align:center;cursor:pointer" />
+            <input type="date" id="matchDateNative" onchange="MS.onNativeDate(this.value)" />
+          </div>
           <div class="score">
             <input class="num" id="homeScore" type="number" min="0" value="0" onchange="MS.touch()" />
             <span style="color:var(--muted)">:</span>
@@ -291,19 +345,34 @@
   </section>
 </main>
 
+<!-- Dedicated one-page print sheet (filled on Export PDF; only visible when printing) -->
+<div id="printSheet"></div>
+
 <script src="data.js"></script>
 <script>
+// Each formation: index-aligned coords [x,y] (x: 0=left..100=right of screen; y: 92=bottom/GK..18=top/attack)
+// and pos[] = the approved position code for that slot. Names are from the player's own
+// perspective (mirrored): LB sits on the LEFT of the screen.
 const FORMATIONS = {
-  "4-4-2":   [[50,92],[18,74],[39,76],[61,76],[82,74],[16,50],[39,52],[61,52],[84,50],[38,26],[62,26]],
-  "4-3-3":   [[50,92],[18,74],[39,76],[61,76],[82,74],[30,54],[50,56],[70,54],[22,28],[50,22],[78,28]],
-  "4-2-3-1": [[50,92],[18,74],[39,76],[61,76],[82,74],[38,58],[62,58],[22,38],[50,36],[78,38],[50,18]],
-  "4-1-4-1": [[50,92],[18,74],[39,76],[61,76],[82,74],[50,60],[18,44],[39,42],[61,42],[82,44],[50,20]],
-  "3-5-2":   [[50,92],[30,76],[50,78],[70,76],[12,54],[35,54],[50,56],[65,54],[88,54],[38,26],[62,26]],
-  "3-4-3":   [[50,92],[30,76],[50,78],[70,76],[18,54],[40,54],[60,54],[82,54],[22,28],[50,22],[78,28]],
-  "5-3-2":   [[50,92],[12,72],[32,76],[50,78],[68,76],[88,72],[30,52],[50,54],[70,52],[38,26],[62,26]],
-  "4-5-1":   [[50,92],[18,74],[39,76],[61,76],[82,74],[14,50],[34,52],[50,54],[66,52],[86,50],[50,22]]
+  "4-4-2":      {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[16,50],[39,52],[61,52],[84,50],[38,26],[62,26]],
+                 pos:["GK","LB","LCB","RCB","RB","LW","LDM","RDM","RW","LS","RS"]},
+  "4-3-3":      {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[30,54],[50,56],[70,54],[22,28],[50,22],[78,28]],
+                 pos:["GK","LB","LCB","RCB","RB","LCM","CDM","RCM","LW","ST","RW"]},
+  "4-2-3-1":    {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[38,58],[62,58],[22,38],[50,36],[78,38],[50,18]],
+                 pos:["GK","LB","LCB","RCB","RB","LDM","RDM","LW","AM","RW","ST"]},
+  "4-1-4-1":    {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[50,60],[18,44],[39,42],[61,42],[82,44],[50,20]],
+                 pos:["GK","LB","LCB","RCB","RB","CDM","LW","LCM","RCM","RW","ST"]},
+  "3-5-2 (DM)": {coords:[[50,92],[30,76],[50,78],[70,76],[12,54],[35,54],[50,56],[65,54],[88,54],[38,26],[62,26]],
+                 pos:["GK","LCD","CCD","RCD","LWB","LCM","DM","RCM","RWB","LS","RS"]},
+  "3-5-2 (AM)": {coords:[[50,92],[30,76],[50,78],[70,76],[12,56],[38,58],[62,58],[88,56],[50,40],[38,24],[62,24]],
+                 pos:["GK","LCD","CCD","RCD","LWB","LCM","RCM","RWB","AM","LS","RS"]},
+  "3-4-3":      {coords:[[50,92],[30,76],[50,78],[70,76],[14,54],[40,54],[60,54],[86,54],[22,28],[50,22],[78,28]],
+                 pos:["GK","LCD","CCD","RCD","LWB","LDM","RDM","RWB","LW","ST","RW"]},
+  "5-3-2":      {coords:[[50,92],[12,72],[32,76],[50,78],[68,76],[88,72],[30,52],[50,54],[70,52],[38,26],[62,26]],
+                 pos:["GK","LWB","LCB","CCB","RCB","RWB","LCM","DMF","RCM","LS","RS"]},
+  "4-5-1":      {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[14,50],[34,52],[50,54],[66,52],[86,50],[50,22]],
+                 pos:["GK","LB","LCB","RCB","RB","LW","LCM","DMF","RCM","RW","ST"]}
 };
-const POSN = ["GK","RB","CB","CB","LB","RM","CM","CM","LM","ST","ST"];
 
 const MS = {
   data:{teams:[], sheets:[], fixtures:[]},
@@ -680,7 +749,7 @@ const MS = {
         <div class="row">
           <label style="align-self:center">Formation</label>
           <select onchange="MS.setFormation('${side}',this.value)">
-            ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>1-${f}</option>`).join('')}
+            ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>${fmtFormation(f)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -688,6 +757,7 @@ const MS = {
         <div class="line halfway"></div><div class="circle"></div>
         <div class="box top"></div><div class="box bot"></div>
       </div>
+      <div class="hint no-print" style="text-align:center;margin-top:4px">Tap a player on the pitch, then another, to swap their positions.</div>
       <div class="grid2" style="margin-top:12px">
         <div class="listcol">
           <h3>Starting XI <span class="xi-count ${s.xi.length===11?'full':''}">${s.xi.length}/11</span></h3>
@@ -735,26 +805,48 @@ const MS = {
   },
   subHTML(side,sub,i){
     const s=this.cur[side];
-    const opt=(sel)=>s.roster.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
+    const xiIds=new Set(s.xi.map(p=>p.id));
+    const opt=(pool,sel)=>pool.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
+    // Players already used in OTHER sub rows (so they don't appear again)
+    const usedOff=new Set(), usedOn=new Set();
+    (s.subs||[]).forEach((x,j)=>{ if(j===i) return; if(x.off) usedOff.add(x.off); if(x.on) usedOn.add(x.on); });
+    // OFF = XI players not already subbed off elsewhere; ON = bench players not already brought on elsewhere
+    const onPitch=s.roster.filter(p=>xiIds.has(p.id) && (!usedOff.has(p.id)||p.id===sub.off));
+    const bench=s.roster.filter(p=>!xiIds.has(p.id) && (!usedOn.has(p.id)||p.id===sub.on));
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--red)">↓</span>
-      <select onchange="MS.setSub('${side}',${i},'off',this.value)"><option value="">off…</option>${opt(sub.off)}</select>
+      <select onchange="MS.setSub('${side}',${i},'off',this.value)"><option value="">off…</option>${opt(onPitch,sub.off)}</select>
       <span class="arrow" style="color:var(--green)">↑</span>
-      <select onchange="MS.setSub('${side}',${i},'on',this.value)"><option value="">on…</option>${opt(sub.on)}</select>
+      <select onchange="MS.setSub('${side}',${i},'on',this.value)"><option value="">on…</option>${opt(bench,sub.on)}</select>
       <button class="btn-danger no-print" onclick="MS.delSub('${side}',${i})">✕</button>
     </div>`;
   },
   renderPitch(side){
     const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
     pitch.querySelectorAll('.spot').forEach(e=>e.remove());
-    const coords=FORMATIONS[s.formation];
+    const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
     s.xi.slice(0,11).forEach((p,i)=>{
-      const [x,y]=coords[i];
+      const [x,y]=f.coords[i]||[50,50];
+      const pos=f.pos[i]||'';
       const d=document.createElement('div'); d.className='spot'; d.style.left=x+'%'; d.style.top=y+'%';
-      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl">${esc(lastName(p.name))}</div>`;
+      if(this._swapSel && this._swapSel.side===side && this._swapSel.i===i) d.classList.add('sel');
+      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl"><b>${esc(pos)}</b> ${esc(lastName(p.name))}</div>`;
+      d.onclick=()=>MS.pitchTap(side,i);
       pitch.appendChild(d);
     });
+  },
+  // Tap one player on the pitch then another → swap their positions.
+  _swapSel:null,
+  pitchTap(side,i){
+    if(this._swapSel && this._swapSel.side===side){
+      const j=this._swapSel.i;
+      if(j!==i){ const xi=this.cur[side].xi; [xi[i],xi[j]]=[xi[j],xi[i]]; this.touch(); }
+      this._swapSel=null;
+    } else {
+      this._swapSel={side,i};
+    }
+    this.renderPitch(side);
   },
   setFormation(side,f){ this.cur[side].formation=f; this.renderSide(side); this.touch(); },
   setNum(side,pid,val){
@@ -785,7 +877,13 @@ const MS = {
 
   // subs
   addSub(side){ this.cur[side].subs.push({min:'',off:'',on:''}); this.renderSide(side); this.touch(); },
-  setSub(side,i,field,val){ this.cur[side].subs[i][field]= field==='min'?(parseInt(val)||''):val; this.touch(); },
+  setSub(side,i,field,val){
+    this.cur[side].subs[i][field]= field==='min'?(parseInt(val)||''):val;
+    this.touch();
+    // Re-render the subs block when a player is chosen, so the same player drops
+    // out of the other rows' dropdowns (can't be subbed off/on twice).
+    if(field!=='min'){ document.getElementById('subs-'+side).innerHTML=this.cur[side].subs.map((sub,j)=>this.subHTML(side,sub,j)).join(''); }
+  },
   delSub(side,i){ this.cur[side].subs.splice(i,1); this.renderSide(side); this.touch(); },
 
   // ---------- save / load sheets ----------
@@ -801,6 +899,21 @@ const MS = {
       away:this.cur.away?JSON.parse(JSON.stringify(this.cur.away)):null,
       savedAt:new Date().toISOString()
     };
+  },
+  // ---------- date picker (native calendar → DD/MM/YYYY display) ----------
+  openDate(){
+    const nat=document.getElementById('matchDateNative');
+    // seed the native picker from the current DD/MM/YYYY value
+    const cur=document.getElementById('matchDate').value;
+    const m=cur.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(m) nat.value=`${m[3]}-${m[2]}-${m[1]}`;
+    if(nat.showPicker){ try{ nat.showPicker(); return; }catch(e){} }
+    nat.focus(); nat.click();
+  },
+  onNativeDate(iso){
+    if(!iso) return;
+    document.getElementById('matchDate').value=normDate(iso); // → DD/MM/YYYY
+    this.touch();
   },
   touch(){
     this._dirty=true;
@@ -893,10 +1006,66 @@ const MS = {
     if(!issues.length) return true;
     return confirm(`Before you ${action}:\n\n• ${issues.join('\n• ')}\n\nContinue anyway?`);
   },
+  // Build the dedicated one-page (landscape) match sheet: both teams side by side,
+  // each with a mini formation pitch, the XI, and subs. Only this prints.
+  buildPrintSheet(){
+    // Always render the date as DD/MM/YYYY on the document, whatever was typed/loaded.
+    const d=normDate(document.getElementById('matchDate').value||'');
+    const hs=document.getElementById('homeScore').value, as=document.getElementById('awayScore').value;
+    const teamCol=(s)=>{
+      if(!s) return '<div class="ps-team"><div class="ps-tname">—</div></div>';
+      const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
+      const spots=s.xi.slice(0,11).map((p,i)=>{
+        const [x,y]=f.coords[i]||[50,50];
+        return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl"><b>${esc(f.pos[i]||'')}</b> ${esc(lastName(p.name))}</span></div>`;
+      }).join('');
+      const xiList=s.xi.map((p,i)=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${esc(f.pos[i]||'')}</span>${esc(p.name)}</div>`).join('');
+      const subs=(s.subs||[]).filter(x=>x.on||x.off).map(x=>{
+        const off=x.off?(s.roster.find(p=>p.id===x.off)||{}).name:'';
+        const on=x.on?(s.roster.find(p=>p.id===x.on)||{}).name:'';
+        return `<div class="ps-sub"><b>${x.min||'?'}'</b> ${off?'↓ '+esc(off):''} ${on?'↑ '+esc(on):''}</div>`;
+      }).join('');
+      return `<div class="ps-team">
+        <div class="ps-tname">${crestImg(s.name,'crest-lg')}${esc(s.name)} <span class="ps-form">${fmtFormation(s.formation)}</span></div>
+        <div class="ps-pitch">
+          <div class="ps-halfway"></div><div class="ps-circle"></div>
+          <div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div>
+          ${spots}
+        </div>
+        <div class="ps-xi">${xiList}</div>
+        ${subs?`<div class="ps-subs"><div class="ps-subs-h">Substitutions</div>${subs}</div>`:''}
+      </div>`;
+    };
+    document.getElementById('printSheet').innerHTML=`
+      <div class="ps-head">
+        <img class="ps-logo" src="logos/Logo-scios-bright.png" alt="Science of Sports">
+        <div class="ps-score">
+          ${crestImg(this.cur.home?this.cur.home.name:'','crest-lg')}
+          <span class="ps-hn">${esc(this.cur.home?this.cur.home.name:'Home')}</span>
+          <span class="ps-sc">${hs} – ${as}</span>
+          <span class="ps-an">${esc(this.cur.away?this.cur.away.name:'Away')}</span>
+          ${crestImg(this.cur.away?this.cur.away.name:'','crest-lg')}
+        </div>
+        <div class="ps-date">${esc(d)}</div>
+      </div>
+      <div class="ps-body">
+        ${teamCol(this.cur.home)}
+        ${teamCol(this.cur.away)}
+      </div>
+      <div class="ps-foot">Generated by SCIOS Match Sheet · matchsheet.scienceofsports.net</div>`;
+  },
   exportPDF(){
     if(!this.confirmIfInvalid('export the PDF')) return;
     if(!this.cur.home||!this.cur.away){
       if(!confirm('Both teams are not selected yet. Export anyway?')) return;
+    }
+    this.buildPrintSheet();
+    // One-time tip: the browser adds a date/URL header & footer — show how to remove it.
+    if(!localStorage.getItem('scios_ms_printtip')){
+      localStorage.setItem('scios_ms_printtip','1');
+      alert('Tip: in the print dialog, open "More settings" and UNCHECK "Headers and footers" '
+        + 'to remove the date/URL from the page. The browser remembers this for next time.\n\n'
+        + 'Also tick "Background graphics" so the pitch prints green.');
     }
     // The PDF filename comes from document.title in the print dialog — set it so the
     // saved file is "Home vs Away DD-MM-YYYY.pdf", ready to send on WhatsApp.
@@ -914,7 +1083,7 @@ const MS = {
       const subs=(s.subs||[]).filter(x=>x.on||x.off)
         .map(x=>`${x.min||'?'}' ${x.off?'OUT '+(s.roster.find(p=>p.id===x.off)||{}).name:''}${x.on?' / IN '+(s.roster.find(p=>p.id===x.on)||{}).name:''}`)
         .join('\n');
-      return `*${s.name}* (1-${s.formation})\n${xi}${subs?'\nSubs:\n'+subs:''}`;
+      return `*${s.name}* (${fmtFormation(s.formation)})\n${xi}${subs?'\nSubs:\n'+subs:''}`;
     };
     const d=document.getElementById('matchDate').value;
     const hs=document.getElementById('homeScore').value, as=document.getElementById('awayScore').value;
@@ -952,11 +1121,12 @@ const MS = {
         subbed_off_minute: (subbedOff[p.id]??null),
         player_image_url: null
       });
-      const starters=s.xi.map((p,i)=>mk(p, POSN[i]||''));
+      const f=FORMATIONS[s.formation]||{pos:[]};
+      const starters=s.xi.map((p,i)=>mk(p, f.pos[i]||''));
       const startIds=new Set(s.xi.map(p=>p.id));
       // anyone brought on as a sub who isn't a starter counts as a sub
       const subPlayers=s.roster.filter(p=>!startIds.has(p.id) && subbedOn[p.id]!==undefined).map(p=>mk(p,''));
-      return { team_id:s.teamId||'', team_name:s.name, formation:'1-'+s.formation, starters, subs:subPlayers };
+      return { team_id:s.teamId||'', team_name:s.name, formation:s.formation, starters, subs:subPlayers };
     };
     return {
       // wrapper metadata so the importer can match the fixture; the platform's
@@ -972,10 +1142,39 @@ const MS = {
       away_team: sideObj(this.cur.away)
     };
   },
+  // Flat per-player-per-match appearance records for season position tracking
+  // (matches PLAYER-POSITION-TRACKING-SPEC.md §5). One row per starter + per sub.
+  appearances(){
+    const date=normDate(document.getElementById('matchDate').value||'');
+    const rows=[];
+    const add=(s)=>{
+      if(!s) return;
+      const f=FORMATIONS[s.formation]||{pos:[]};
+      const subOff={}, subOn={};
+      (s.subs||[]).forEach(x=>{ if(x.off) subOff[x.off]=x.min||null; if(x.on) subOn[x.on]=x.min||null; });
+      const startIds=new Set(s.xi.map(p=>p.id));
+      s.xi.forEach((p,i)=>rows.push({
+        player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
+        match_date:date, formation:fmtFormation(s.formation), position_code:f.pos[i]||'',
+        shirt_number:p.num??null, role:'starter',
+        sub_off_minute:subOff[p.id]??null, sub_on_minute:null
+      }));
+      s.roster.filter(p=>!startIds.has(p.id) && subOn[p.id]!==undefined).forEach(p=>rows.push({
+        player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
+        match_date:date, formation:fmtFormation(s.formation), position_code:null,
+        shirt_number:p.num??null, role:'sub',
+        sub_off_minute:null, sub_on_minute:subOn[p.id]??null
+      }));
+    };
+    add(this.cur.home); add(this.cur.away);
+    return rows;
+  },
   exportSCIOS(){
     if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
     if(!this.confirmIfInvalid('export for SCIOS')) return;
-    const json=JSON.stringify(this.sciosLineup(), null, 2);
+    const payload=this.sciosLineup();
+    payload.appearances=this.appearances();   // season position-tracking records
+    const json=JSON.stringify(payload, null, 2);
     const blob=new Blob([json],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -1072,6 +1271,8 @@ function todayDDMMYYYY(){
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function lastName(n){const p=String(n||'').trim().split(' ');return p[p.length-1];}
+// "4-4-2" → "1-4-4-2"; "3-5-2 (DM)" → "1-3-5-2 (DM)"
+function fmtFormation(f){ return String(f||'').replace(/^(\d)/,'1-$1'); }
 
 // ---- team logos ----
 // Known logo files in logos/ (base names, .png). Used to resolve a team → crest.
