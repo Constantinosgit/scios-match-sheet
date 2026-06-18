@@ -1231,10 +1231,20 @@ const MS = {
     this.syncScore(); this.touch();
   },
   delGoal(side,i){ this.cur[side].goals.splice(i,1); this.renderSide(side); this.syncScore(); this.touch(); },
-  // Auto-fill the score boxes from the number of goals logged per team (still hand-editable).
+  // Auto-fill the score boxes from logged goals (still hand-editable).
+  // Counts only goals with a scorer (blank rows ignored). An own goal (OG)
+  // counts for the OPPONENT, not the team it's logged under.
   syncScore(){
-    if(this.cur.home) document.getElementById('homeScore').value=this.cur.home.goals.length;
-    if(this.cur.away) document.getElementById('awayScore').value=this.cur.away.goals.length;
+    const tally=(side)=>{
+      const s=this.cur[side], opp=side==='home'?'away':'home';
+      let own=0, ownGoalsAgainst=0;
+      (s&&s.goals||[]).forEach(g=>{ if(!g.player) return; if(g.kind==='OG') ownGoalsAgainst++; else own++; });
+      // goals this side scored = its normal/pen goals + opponent's own goals
+      const oppOG=(this.cur[opp]&&this.cur[opp].goals||[]).filter(g=>g.player&&g.kind==='OG').length;
+      return {forThisSide: own + oppOG, ownGoalsAgainst};
+    };
+    if(this.cur.home) document.getElementById('homeScore').value=tally('home').forThisSide;
+    if(this.cur.away) document.getElementById('awayScore').value=tally('away').forThisSide;
     this.updateStrip();
   },
 
