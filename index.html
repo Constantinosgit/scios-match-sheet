@@ -135,6 +135,7 @@
   /* formation pitch — green with mowing stripes */
   .pitch{position:relative;border:1px solid rgba(255,255,255,.25);border-radius:10px;
     aspect-ratio:68/64;overflow:hidden;
+    max-width:360px;margin-left:auto;margin-right:auto;  /* smaller, centered on desktop */
     background:
       repeating-linear-gradient(0deg, #2e8b40 0 12.5%, #2a8139 12.5% 25%);}
   .pitch .line{position:absolute;background:rgba(255,255,255,.55)}
@@ -214,7 +215,7 @@
     .grid2{grid-template-columns:1fr;gap:14px}
 
     /* bigger pitch dots / labels on the formation view */
-    .pitch{aspect-ratio:5/6}            /* taller pitch reads better on a phone */
+    .pitch{aspect-ratio:5/6;max-width:none}  /* taller, full-width pitch reads better on a phone */
     .spot{width:84px}                   /* wide enough for long surnames on one line */
     .spot .dot{width:42px;height:42px;font-size:16px}
     .spot .lbl{font-size:10.5px}        /* fits e.g. Christodoulou */
@@ -457,7 +458,7 @@ const FORMATIONS = {
   "4-5-1":      {coords:[[50,92],[18,74],[39,76],[61,76],[82,74],[14,50],[34,52],[50,54],[66,52],[86,50],[50,22]],
                  pos:["GK","LB","LCB","RCB","RB","LW","LCM","DMF","RCM","RW","ST"]}
 };
-const MAX_SUBS = 5;   // standard modern cap (FIFA/UEFA); change if a competition differs
+const MAX_SUBS = 6;   // cap raised to 6 (U14–U17 allow 6; Men/U19 use 5 — user self-limits)
 // All position codes used across the formations, grouped for the rosters dropdown.
 const POSITION_OPTIONS = [
   {group:"Goalkeeper", codes:["GK"]},
