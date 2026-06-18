@@ -244,7 +244,11 @@
     /* hide ALL the app UI; show only the dedicated print sheet */
     header.app,.tabs,main,.no-print{display:none!important}
     #printSheet{display:block!important}
+  }
 
+  /* ===== The match-sheet document styles (used by BOTH the print output and
+     the on-screen Preview overlay). Harmless on screen because #printSheet is
+     hidden until printing or previewing. ===== */
     .ps-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0A1628;padding-bottom:6px;margin-bottom:10px}
     .ps-logo{height:48px;width:auto}
     .ps-score{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
@@ -296,8 +300,25 @@
     .ps-ref{font-size:11px;font-weight:700;color:#3A5070;margin-top:2px}
     .ps-foot{margin-top:8px;text-align:center;font-size:10px;color:#7A90B0}
     .crest,.crest-lg{display:inline-block}
-  }
+
+  /* On screen the print sheet is hidden — shown only when printing or previewing. */
   #printSheet{display:none}
+  body.previewing #printSheet{
+    display:block;position:fixed;inset:0;z-index:9999;overflow:auto;
+    background:#5b6472;padding:24px 12px 80px;
+  }
+  /* frame the sheet as a white A4-ish page centered in the overlay */
+  body.previewing #printSheet>.ps-head,
+  body.previewing #printSheet>.ps-body,
+  body.previewing #printSheet>.ps-foot{max-width:900px;margin-left:auto;margin-right:auto;background:#fff}
+  body.previewing #printSheet>.ps-head{padding:14px 18px 6px;border-radius:8px 8px 0 0}
+  body.previewing #printSheet>.ps-body{padding:0 18px 14px}
+  body.previewing #printSheet>.ps-foot{padding:0 18px 18px;border-radius:0 0 8px 8px}
+  /* preview action bar (Print / Close) pinned to the top of the overlay */
+  .preview-bar{display:none}
+  body.previewing .preview-bar{display:flex;gap:10px;justify-content:center;align-items:center;
+    position:fixed;top:0;left:0;right:0;z-index:10000;background:#0A1628;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  body.previewing #printSheet{padding-top:64px}
 </style>
 </head>
 <body>
@@ -309,6 +330,7 @@
   <button class="btn-ghost no-print" onclick="MS.newSheet()">New</button>
   <button class="btn-ghost no-print" onclick="MS.saveSheet()">Save</button>
   <button class="btn-ghost no-print" onclick="MS.share()" title="Share to WhatsApp / email">📲 Share</button>
+  <button class="btn-ghost no-print" onclick="MS.preview()" title="Preview the match sheet before printing">👁 Preview</button>
   <button class="btn-primary no-print" onclick="MS.exportPDF()">Export PDF</button>
   <div class="menu-wrap no-print">
     <button class="btn-ghost" onclick="MS.toggleMenu(event)" title="More">⋯</button>
@@ -443,7 +465,12 @@
   </section>
 </main>
 
-<!-- Dedicated one-page print sheet (filled on Export PDF; only visible when printing) -->
+<!-- Preview action bar (only visible while previewing on screen) -->
+<div class="preview-bar no-print">
+  <button class="btn-primary" onclick="MS.exportPDF()">🖨 Print / Save PDF</button>
+  <button class="btn-ghost" onclick="MS.closePreview()" style="color:#fff">✕ Close preview</button>
+</div>
+<!-- Dedicated one-page print sheet (filled on Export PDF / Preview; only visible when printing or previewing) -->
 <div id="printSheet"></div>
 
 <script src="data.js"></script>
@@ -1479,6 +1506,17 @@ const MS = {
     window.print();
     setTimeout(()=>{ document.title=prev; }, 800);
   },
+  // On-screen preview of the finished match sheet (same layout as the PDF) so the
+  // user can check it before printing. Print / Close live in the preview bar.
+  preview(){
+    if(!this.cur.home||!this.cur.away){
+      if(!confirm('Both teams are not selected yet. Preview anyway?')) return;
+    }
+    this.buildPrintSheet();
+    document.body.classList.add('previewing');
+    window.scrollTo(0,0);
+  },
+  closePreview(){ document.body.classList.remove('previewing'); },
 
   // A plain-text summary of the sheet — handy to paste/share in WhatsApp.
   sheetText(){
@@ -1644,6 +1682,8 @@ const MS = {
     }
     // close the ••• menu when clicking elsewhere
     document.addEventListener('click', e=>{ if(!e.target.closest('.menu-wrap')) this.closeMenu(); });
+    // Esc closes the preview overlay
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') this.closePreview(); });
   }
 };
 function parseCSV(text){
