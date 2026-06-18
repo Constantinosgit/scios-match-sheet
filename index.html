@@ -160,6 +160,13 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* desktop: show full "C. Charalambides"; mobile: surname only (see media query) */
   .spot .lbl-short{display:none}
+  /* event markers on a pitch spot: goal ⚽, card, ↓ sub-off minute */
+  .spot .spot-ev{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:2px;line-height:1}
+  .spot .spot-ev span{font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px #000}
+  .spot .ev-off{color:#ffd2cc}
+  .spot .ev-card{padding:0 3px;border-radius:3px;text-shadow:none}
+  .spot .ev-card-y{background:#F4C20D;color:#3a2f00}
+  .spot .ev-card-r{background:#D7263D;color:#fff}
 
   /* brand logo in header */
   .brand-logo{height:44px;width:auto;display:block}
@@ -281,6 +288,13 @@
     /* show full names — wrap to 2 lines instead of truncating with "…" */
     .ps-lbl{font-size:8px;line-height:1.05;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;
       display:block;margin-top:1px;word-break:break-word}
+    /* event markers on a PDF pitch spot: goal ⚽, card, ↓ sub-off minute */
+    .ps-spot .spot-ev{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:1px;line-height:1}
+    .ps-spot .spot-ev span{font-size:7.5px;font-weight:800}
+    .ps-spot .ev-goal,.ps-spot .ev-off{color:#fff;text-shadow:0 1px 2px #000}
+    .ps-spot .ev-card{padding:0 2px;border-radius:2px}
+    .ps-spot .ev-card-y{background:#F4C20D;color:#3a2f00}
+    .ps-spot .ev-card-r{background:#D7263D;color:#fff}
 
     .ps-xi{font-size:11.5px}
     .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
@@ -1103,12 +1117,13 @@ const MS = {
     const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
     pitch.querySelectorAll('.spot').forEach(e=>e.remove());
     const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
+    const ev=this.playerEvents(s);   // per-player goals / card / sub-off minute
     s.xi.slice(0,11).forEach((p,i)=>{
       const [x,y]=f.coords[i]||[50,50];
       const pos=f.pos[i]||'';
       const d=document.createElement('div'); d.className='spot'; d.style.left=x+'%'; d.style.top=y+'%';
       if(this._swapSel && this._swapSel.side===side && this._swapSel.i===i) d.classList.add('sel');
-      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl"><span class="lbl-full">${esc(shortName(p.name))}</span><span class="lbl-short">${esc(lastName(p.name))}</span></div>`;
+      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl"><span class="lbl-full">${esc(shortName(p.name))}</span><span class="lbl-short">${esc(lastName(p.name))}</span></div>${this.spotEvents(ev[p.id])}`;
       d.onclick=()=>MS.pitchTap(side,i);
       pitch.appendChild(d);
     });
@@ -1173,6 +1188,8 @@ const MS = {
     // re-rendering the minute field doesn't disrupt typing.
     const el=document.getElementById('subs-'+side);
     if(el) el.innerHTML=this.cur[side].subs.map((sub,j)=>this.subHTML(side,sub,j)).join('');
+    // refresh the pitch so the subbed-off player shows his ↓minute marker
+    this.renderPitch(side);
   },
   delSub(side,i){ this.cur[side].subs.splice(i,1); this.renderSide(side); this.touch(); },
 
@@ -1422,6 +1439,16 @@ const MS = {
     if(e.on!=null)  out+=`<span class="ps-ev ps-on">↑${e.on}'</span>`;
     return out?`<span class="ps-evs">${out}</span>`:'';
   },
+  // Compact event markers shown ON a pitch spot for a starter: goal(s), card,
+  // and the minute he was subbed off. Used by both the editor and the PDF pitch.
+  spotEvents(e){
+    if(!e) return '';
+    let out='';
+    e.goals.forEach(g=>out+=`<span class="ev-goal">⚽${g}</span>`);
+    if(e.card) out+=`<span class="ev-card ev-card-${e.card.type==='R'?'r':'y'}">${e.card.min}'</span>`;
+    if(e.off!=null) out+=`<span class="ev-off">↓${e.off}'</span>`;
+    return out?`<span class="spot-ev">${out}</span>`:'';
+  },
   // Build the dedicated one-page (landscape) match sheet: both teams side by side,
   // each with a mini formation pitch, the XI, and subs. Only this prints.
   buildPrintSheet(){
@@ -1431,12 +1458,12 @@ const MS = {
     const teamCol=(s,side)=>{
       if(!s) return '<div class="ps-team"><div class="ps-tname">—</div></div>';
       const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
-      // Pitch dots: name only (matches the on-screen pitch — position is NOT repeated here).
+      const ev=this.playerEvents(s);
+      // Pitch dots: number + name + the player's own events (goal ⚽, card, ↓ sub-off minute).
       const spots=s.xi.slice(0,11).map((p,i)=>{
         const [x,y]=f.coords[i]||[50,50];
-        return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(shortName(p.name))}</span></div>`;
+        return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(shortName(p.name))}</span>${this.spotEvents(ev[p.id])}</div>`;
       }).join('');
-      const ev=this.playerEvents(s);
       // XI list: position group (GKP/DEF/MID/ATT) + number + name + the player's own events.
       const xiList=s.xi.map((p,i)=>{
         const grp=this.positionGroup(f.pos[i]);
