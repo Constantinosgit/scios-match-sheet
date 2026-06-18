@@ -282,6 +282,12 @@
     .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
     .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8}
     .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070}
+    /* per-player event tags on the line-up rows */
+    .ps-evs{float:right;display:inline-flex;gap:4px;align-items:center}
+    .ps-ev{font-size:9.5px;font-weight:700;color:#3A5070;line-height:1}
+    .ps-ev.ps-off{color:#C0392B}.ps-ev.ps-on{color:#1E8449}
+    .ps-ev.ps-card-y{background:#F4C20D;color:#3a2f00;border-radius:2px;padding:1px 3px}
+    .ps-ev.ps-card-r{background:#D7263D;color:#fff;border-radius:2px;padding:1px 3px}
     .ps-subs{margin-top:6px;border-top:1px dashed #C8D4EC;padding-top:5px;font-size:11px}
     .ps-subs-h{font-weight:700;text-transform:uppercase;font-size:10px;color:#3A5070;margin-bottom:3px}
     .ps-sub{padding:1px 0}
@@ -1345,6 +1351,42 @@ const MS = {
     if(!issues.length) return true;
     return confirm(`Before you ${action}:\n\n• ${issues.join('\n• ')}\n\nContinue anyway?`);
   },
+  // Map a detailed slot code (LCB, RWB, AM, ST…) to the broad group Wyscout shows.
+  positionGroup(code){
+    const c=(code||'').toUpperCase();
+    if(c==='GK'||c==='GKP') return 'GKP';
+    if(/W?B$|CB$|CD$|^D|WB$/.test(c) && !/DM$|DMF$/.test(c)) return 'DEF';
+    if(/M$|MF$|DM$|DMF$/.test(c)) return 'MID';
+    return 'ATT';   // wings/strikers (LW,RW,ST,LS,RS) and anything else
+  },
+  // Per-player match events, keyed by player id: off/on minute, goal minutes, card.
+  // Built by replaying the starting XI + subs so each player carries his own timeline,
+  // matching the Wyscout team sheet (events shown against the line-up).
+  playerEvents(s){
+    const ev={};
+    const get=id=>ev[id]||(ev[id]={off:null,on:null,goals:[],card:null});
+    // subs: off-minute on the player going off, on-minute on the player coming on
+    (s.subs||[]).filter(x=>x.off||x.on).forEach(x=>{
+      if(x.off) get(x.off).off=x.min||'?';
+      if(x.on)  get(x.on).on =x.min||'?';
+    });
+    (s.goals||[]).filter(g=>g.player).forEach(g=>{
+      const tag=g.kind==='P'?'(P)':g.kind==='OG'?'(OG)':'';
+      get(g.player).goals.push((g.min||'?')+"'"+tag);
+    });
+    (s.cards||[]).filter(c=>c.player).forEach(c=>{ get(c.player).card={type:c.type||'Y',min:c.min||'?'}; });
+    return ev;
+  },
+  // Compact HTML of a player's events for the line-up row (goals ⚽, card box, ↓/↑ minute).
+  eventTags(e){
+    if(!e) return '';
+    let out='';
+    e.goals.forEach(g=>out+=`<span class="ps-ev">⚽${g}</span>`);
+    if(e.card) out+=`<span class="ps-ev ps-card-${e.card.type==='R'?'r':'y'}">${e.card.min}'</span>`;
+    if(e.off!=null) out+=`<span class="ps-ev ps-off">↓${e.off}'</span>`;
+    if(e.on!=null)  out+=`<span class="ps-ev ps-on">↑${e.on}'</span>`;
+    return out?`<span class="ps-evs">${out}</span>`:'';
+  },
   // Build the dedicated one-page (landscape) match sheet: both teams side by side,
   // each with a mini formation pitch, the XI, and subs. Only this prints.
   buildPrintSheet(){
@@ -1359,13 +1401,16 @@ const MS = {
         const [x,y]=f.coords[i]||[50,50];
         return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(shortName(p.name))}</span></div>`;
       }).join('');
-      // XI list: keep the position column + initial+surname name (the proper place for positions).
-      const xiList=s.xi.map((p,i)=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${esc(f.pos[i]||'')}</span>${esc(shortName(p.name))}</div>`).join('');
-      const subs=(s.subs||[]).filter(x=>x.on||x.off).map(x=>{
-        const off=x.off?(s.roster.find(p=>p.id===x.off)||{}).name:'';
-        const on=x.on?(s.roster.find(p=>p.id===x.on)||{}).name:'';
-        return `<div class="ps-sub"><b>${x.min||'?'}'</b> ${off?'↓ '+esc(off):''} ${on?'↑ '+esc(on):''}</div>`;
+      const ev=this.playerEvents(s);
+      // XI list: position group (GKP/DEF/MID/ATT) + number + name + the player's own events.
+      const xiList=s.xi.map((p,i)=>{
+        const grp=this.positionGroup(f.pos[i]);
+        return `<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${grp}</span>${esc(shortName(p.name))}${this.eventTags(ev[p.id])}</div>`;
       }).join('');
+      // Bench: everyone in the squad not in the XI, with their events (who came on, cards…).
+      const xiIds=new Set(s.xi.map(p=>p.id));
+      const benchList=s.roster.filter(p=>!xiIds.has(p.id))
+        .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span>${esc(shortName(p.name))}${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
         const tag=g.kind==='P'?' (pen)':g.kind==='OG'?' (o.g.)':'';
@@ -1384,7 +1429,7 @@ const MS = {
           ${spots}
         </div>
         <div class="ps-xi">${xiList}</div>
-        ${subs?`<div class="ps-subs"><div class="ps-subs-h">Substitutions</div>${subs}</div>`:''}
+        ${benchList?`<div class="ps-subs"><div class="ps-subs-h">Bench</div><div class="ps-xi">${benchList}</div></div>`:''}
         ${goals?`<div class="ps-subs"><div class="ps-subs-h">Goals</div>${goals}</div>`:''}
         ${cards?`<div class="ps-subs"><div class="ps-subs-h">Cards</div>${cards}</div>`:''}
       </div>`;
