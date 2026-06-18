@@ -1663,42 +1663,79 @@ const MS = {
 
   // Export the lineup as JSON matching the SCIOS platform's GET /fixtures/:id/lineup
   // response shape (LineupResponse), so the App's match-analysis formation can ingest it.
+  // Total minutes a player was on the pitch (whole-minute model, 90' regulation).
+  // starter not subbed → 90; starter off at m → m; sub on at m → 90-m; on then off → off-on.
+  minutesPlayed(role, onMin, offMin){
+    const FULL=90;
+    const on = role==='starter' ? 0 : (onMin==null?null:onMin);
+    if(on==null) return null;                 // sub who never came on
+    const off = offMin==null ? FULL : offMin;
+    return Math.max(0, off-on);
+  },
   sciosLineup(){
     const sideObj=(s)=>{
-      if(!s) return {team_id:'', team_name:'', starters:[], subs:[]};
+      if(!s) return {team_id:'', team_name:'', starters:[], subs:[], goals:[], cards:[]};
       const subbedOff={}, subbedOn={};
       (s.subs||[]).forEach(sub=>{ if(sub.off) subbedOff[sub.off]=sub.min||null; if(sub.on) subbedOn[sub.on]=sub.min||null; });
-      const mk=(p,posAbbr)=>({
-        player_id: p.srcId||'',                 // SciSports/source id from the imported sheet
-        platform_player_id: null,
-        player_name: p.name,
-        position: '',                            // nominal position not tracked here
-        position_abbr: posAbbr||'',
-        shirt_number: (p.num??null),
-        subbed_on_minute: (subbedOn[p.id]??null),
-        subbed_off_minute: (subbedOff[p.id]??null),
-        player_image_url: null
-      });
-      const f=FORMATIONS[s.formation]||{pos:[]};
-      const starters=s.xi.map((p,i)=>mk(p, f.pos[i]||''));
       const startIds=new Set(s.xi.map(p=>p.id));
+      const mk=(p,posAbbr,role)=>{
+        const onMin=subbedOn[p.id]??null, offMin=subbedOff[p.id]??null;
+        return {
+          player_id: p.srcId||'',                 // SciSports/source id (the platform join key)
+          platform_player_id: null,
+          player_name: p.name,
+          position: posAbbr||'',
+          position_abbr: posAbbr||'',
+          shirt_number: (p.num??null),
+          subbed_on_minute: onMin,
+          subbed_off_minute: offMin,
+          minutes_played: this.minutesPlayed(role, onMin, offMin),
+          player_image_url: null
+        };
+      };
+      const f=FORMATIONS[s.formation]||{pos:[]};
+      const starters=s.xi.map((p,i)=>mk(p, f.pos[i]||'', 'starter'));
       // anyone brought on as a sub who isn't a starter counts as a sub
-      const subPlayers=s.roster.filter(p=>!startIds.has(p.id) && subbedOn[p.id]!==undefined).map(p=>mk(p,''));
-      return { team_id:s.teamId||'', team_name:s.name, formation:s.formation, starters, subs:subPlayers };
+      const subPlayers=s.roster.filter(p=>!startIds.has(p.id) && subbedOn[p.id]!==undefined).map(p=>mk(p,'','sub'));
+      // resolve a roster player id → its SciSports/source id for goal/card records
+      const srcOf=(id)=>{ const p=s.roster.find(x=>x.id===id); return p?(p.srcId||''):''; };
+      const goals=(s.goals||[]).filter(g=>g.player).map(g=>({
+        player_id: srcOf(g.player),
+        minute: (g.min===''||g.min==null)?null:g.min,
+        type: g.kind==='P'?'penalty':g.kind==='OG'?'own_goal':'goal'
+      }));
+      const cards=(s.cards||[]).filter(c=>c.player).map(c=>({
+        player_id: srcOf(c.player),
+        minute: (c.min===''||c.min==null)?null:c.min,
+        type: c.type==='R'?'red':'yellow'
+      }));
+      return { team_id:s.teamId||'', team_name:s.name, formation:s.formation, coach:s.coach||'', starters, subs:subPlayers, goals, cards };
     };
     return {
       // wrapper metadata so the importer can match the fixture; the platform's
       // LineupResponse core (home_team/away_team) is nested verbatim.
       meta:{
+        // Deterministic key from what the sheet knows. NOTE: imported fixtures carry no
+        // unique id yet — confirm the source fixture id with the platform (Cleanthis).
+        match_key: this.matchKey(),
         date: document.getElementById('matchDate').value||'',
         home_score: +document.getElementById('homeScore').value||0,
         away_score: +document.getElementById('awayScore').value||0,
         competition: this.cur.home?this.cur.home.league:'',
-        source:'scios-match-sheet', version:1
+        referee: (document.getElementById('referee').value||'').trim(),
+        source:'scios-match-sheet', version:2
       },
       home_team: sideObj(this.cur.home),
       away_team: sideObj(this.cur.away)
     };
+  },
+  // Deterministic match identifier from competition + date + both teams (until the
+  // platform supplies a real fixture id we can import and carry through).
+  matchKey(){
+    const h=this.cur.home?this.cur.home.name:'', a=this.cur.away?this.cur.away.name:'';
+    const d=(document.getElementById('matchDate').value||'').replace(/\//g,'-');
+    const c=this.cur.home?(this.cur.home.league||''):'';
+    return [c,d,h,a].join('|');
   },
   // Flat per-player-per-match appearance records for season position tracking
   // (matches PLAYER-POSITION-TRACKING-SPEC.md §5). One row per starter + per sub.
@@ -1711,17 +1748,26 @@ const MS = {
       const subOff={}, subOn={};
       (s.subs||[]).forEach(x=>{ if(x.off) subOff[x.off]=x.min||null; if(x.on) subOn[x.on]=x.min||null; });
       const startIds=new Set(s.xi.map(p=>p.id));
+      // per-player goal/card tallies for this match (keyed by roster id)
+      const goalsBy={}, cardsBy={};
+      (s.goals||[]).filter(g=>g.player).forEach(g=>{ goalsBy[g.player]=(goalsBy[g.player]||0)+1; });
+      (s.cards||[]).filter(c=>c.player).forEach(c=>{ (cardsBy[c.player]=cardsBy[c.player]||{y:0,r:0})[c.type==='R'?'r':'y']++; });
+      const tally=(id)=>({goals:goalsBy[id]||0, yellow:(cardsBy[id]||{}).y||0, red:(cardsBy[id]||{}).r||0});
       s.xi.forEach((p,i)=>rows.push({
         player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
         match_date:date, formation:fmtFormation(s.formation), position_code:f.pos[i]||'',
         shirt_number:p.num??null, role:'starter',
-        sub_off_minute:subOff[p.id]??null, sub_on_minute:null
+        sub_off_minute:subOff[p.id]??null, sub_on_minute:null,
+        minutes_played:this.minutesPlayed('starter', null, subOff[p.id]??null),
+        ...tally(p.id)
       }));
       s.roster.filter(p=>!startIds.has(p.id) && subOn[p.id]!==undefined).forEach(p=>rows.push({
         player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
         match_date:date, formation:fmtFormation(s.formation), position_code:null,
         shirt_number:p.num??null, role:'sub',
-        sub_off_minute:null, sub_on_minute:subOn[p.id]??null
+        sub_off_minute:subOff[p.id]??null, sub_on_minute:subOn[p.id]??null,
+        minutes_played:this.minutesPlayed('sub', subOn[p.id]??null, subOff[p.id]??null),
+        ...tally(p.id)
       }));
     };
     add(this.cur.home); add(this.cur.away);

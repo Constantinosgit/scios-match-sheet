@@ -26,7 +26,11 @@ The browser remembers both settings for next time. (The tool shows a one-time re
 3. **Export / share** (header buttons):
    - **Export PDF** — print-to-PDF; the file is named `Home_vs_Away_DD-MM-YYYY.pdf`, ready for WhatsApp.
    - **📲 Share** — on mobile, opens the native share sheet (WhatsApp/email); on desktop, copies a text summary.
-   - **↗ SCIOS** — downloads the lineup as JSON matching the platform's `GET /fixtures/:id/lineup` shape (`home_team`/`away_team` → `starters`/`subs`, with `player_id`, `shirt_number`, sub minutes), for ingestion into the App's match-analysis formation.
+   - **↗ SCIOS** — downloads the match as JSON for the platform (`source:scios-match-sheet`, `version:2`). Contains:
+     - `meta` — `match_key` (deterministic: competition|date|home|away — see note), date, scores, competition, referee.
+     - `home_team`/`away_team` — `formation`, `coach`, `starters[]`/`subs[]` (each with `player_id` [SciSports/source id], `shirt_number`, `position_abbr`, `subbed_on_minute`, `subbed_off_minute`, `minutes_played`), plus per-team `goals[]` (`player_id`, `minute`, `type`: goal/penalty/own_goal) and `cards[]` (`player_id`, `minute`, `type`: yellow/red).
+     - `appearances[]` — one flat row per player per match (per PLAYER-POSITION-TRACKING-SPEC §5) with `position_code`, `role`, sub minutes, `minutes_played`, and `goals`/`yellow`/`red` tallies — ready for season player/team stats.
+     - **Open item for the platform team:** imported fixtures carry no unique id, so `match_key` is a string key, not the platform's fixture id. Confirm whether the source fixtures expose an id to import and carry through.
 
 ## Admin gate
 
