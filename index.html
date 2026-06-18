@@ -261,7 +261,9 @@
     .ps-logo{height:48px;width:auto}
     .ps-score{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
     .ps-score .ps-hn,.ps-score .ps-an{font-size:16px}
-    .ps-score .ps-sc{font-size:22px;color:#1f4ed8}
+    .ps-score .ps-sc{font-size:22px;color:#1f4ed8;white-space:nowrap}
+    .ps-score .ps-hn,.ps-score .ps-an{flex:1}                 /* names take the slack, not the score */
+    .ps-score .ps-hn{text-align:right}.ps-score .ps-an{text-align:left}
     .ps-date{font-size:13px;font-weight:700;color:#3A5070}
 
     /* Portrait split into 2 columns: Home (left) | Away (right) */
