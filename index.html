@@ -1808,8 +1808,6 @@ const MS = {
   // ---------- theme ----------
   applyTheme(t){
     document.documentElement.setAttribute('data-theme', t);
-    const btn=document.getElementById('themeBtn');
-    if(btn) btn.textContent = t==='light' ? '☀️' : '🌙';
     // dark logo in dark mode; bright logo in light mode (per user preference)
     const logo=document.getElementById('brandLogo');
     if(logo) logo.src = t==='light' ? 'logos/Logo-scios-bright.png' : 'logos/Logo-scios-dark.png';
