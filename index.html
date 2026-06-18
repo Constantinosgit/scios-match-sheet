@@ -1197,10 +1197,10 @@ const MS = {
       <input class="min" type="number" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--green)">⚽</span>
       <select onchange="MS.setGoal('${side}',${i},'player',this.value)"><option value="">scorer…</option>${this.playerOptions(side,g.player)}</select>
-      <select class="min" style="width:auto" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
-        <option value="" ${!g.kind?'selected':''}>—</option>
-        <option value="P" ${g.kind==='P'?'selected':''}>P</option>
-        <option value="OG" ${g.kind==='OG'?'selected':''}>OG</option>
+      <select style="width:auto" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
+        <option value="" ${!g.kind?'selected':''}>Normal</option>
+        <option value="P" ${g.kind==='P'?'selected':''}>Penalty</option>
+        <option value="OG" ${g.kind==='OG'?'selected':''}>Own Goal</option>
       </select>
       <button class="btn-danger no-print" onclick="MS.delGoal('${side}',${i})">✕</button>
     </div>`;
@@ -1406,7 +1406,7 @@ const MS = {
       if(x.on)  get(x.on).on =x.min||'?';
     });
     (s.goals||[]).filter(g=>g.player).forEach(g=>{
-      const tag=g.kind==='P'?'(P)':g.kind==='OG'?'(OG)':'';
+      const tag=g.kind==='P'?'(Penalty)':g.kind==='OG'?'(Own Goal)':'';
       get(g.player).goals.push((g.min||'?')+"'"+tag);
     });
     (s.cards||[]).filter(c=>c.player).forEach(c=>{ get(c.player).card={type:c.type||'Y',min:c.min||'?'}; });
@@ -1448,7 +1448,7 @@ const MS = {
         .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span>${esc(shortName(p.name))}${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
-        const tag=g.kind==='P'?' (pen)':g.kind==='OG'?' (o.g.)':'';
+        const tag=g.kind==='P'?' (Penalty)':g.kind==='OG'?' (Own Goal)':'';
         return `<div class="ps-sub"><b>${g.min||'?'}'</b> ⚽ ${esc(nameOf(g.player))}${tag}</div>`;
       }).join('');
       const cards=(s.cards||[]).filter(c=>c.player).map(c=>{
