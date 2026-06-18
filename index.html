@@ -191,6 +191,8 @@
   .saved-item .meta small{color:var(--muted)}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
   .hint{color:var(--muted);font-size:12px;margin-top:4px}
+  /* responsive show/hide: Preview is a header button on desktop, a ⋯ menu item on mobile */
+  .show-mobile{display:none}
 
   /* ===== MOBILE ===== */
   @media(max-width:760px){
@@ -201,6 +203,8 @@
     .logo-sub{margin-left:auto;border-left:none;padding-left:0}  /* push subtitle right */
     header.app .spacer{display:none}
     header.app button{flex:1 1 28%;padding:11px 6px;font-size:13px;min-width:0}
+    .hide-mobile{display:none!important}   /* Preview moves into the ⋯ menu on mobile */
+    .menu .show-mobile{display:block}
     .tabs{padding:8px 10px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
     .tab{white-space:nowrap;font-size:15px}
 
@@ -302,13 +306,15 @@
     .ps-spot .ev-card-r{background:#D7263D;color:#fff}
 
     .ps-xi{font-size:11.5px}
-    .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
-    .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8}
-    .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070}
-    /* per-player event tags on the line-up rows */
-    .ps-evs{float:right;display:inline-flex;gap:4px;align-items:center}
+    .ps-row{display:flex;gap:6px;align-items:center;padding:1.5px 0;break-inside:avoid}
+    .ps-row .ps-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8;flex:none}
+    .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070;flex:none}
+    /* per-player event tags on the line-up rows — right-aligned, pill style to match the pitch */
+    .ps-evs{margin-left:auto;display:inline-flex;gap:4px;align-items:center;flex:none}
     .ps-ev{font-size:9.5px;font-weight:700;color:#3A5070;line-height:1}
-    .ps-ev.ps-off{color:#C0392B}.ps-ev.ps-on{color:#1E8449}
+    .ps-ev.ps-off{background:#D7263D;color:#fff;border-radius:2px;padding:1px 3px}
+    .ps-ev.ps-on{background:#10B981;color:#fff;border-radius:2px;padding:1px 3px}
     .ps-ev.ps-card-y{background:#F4C20D;color:#3a2f00;border-radius:2px;padding:1px 3px}
     .ps-ev.ps-card-r{background:#D7263D;color:#fff;border-radius:2px;padding:1px 3px}
     .ps-subs{margin-top:6px;border-top:1px dashed #C8D4EC;padding-top:5px;font-size:11px}
@@ -349,11 +355,12 @@
   <button class="btn-ghost no-print" onclick="MS.newSheet()">New</button>
   <button class="btn-ghost no-print" onclick="MS.saveSheet()">Save</button>
   <button class="btn-ghost no-print" onclick="MS.share()" title="Share to WhatsApp / email">📲 Share</button>
-  <button class="btn-ghost no-print" onclick="MS.preview()" title="Preview the match sheet before printing">👁 Preview</button>
+  <button class="btn-ghost no-print hide-mobile" onclick="MS.preview()" title="Preview the match sheet before printing">👁 Preview</button>
   <button class="btn-primary no-print" onclick="MS.exportPDF()">Export PDF</button>
   <div class="menu-wrap no-print">
     <button class="btn-ghost" onclick="MS.toggleMenu(event)" title="More">⋯</button>
     <div class="menu" id="hdrMenu">
+      <button class="show-mobile" onclick="MS.preview();MS.closeMenu()">👁 Preview before printing</button>
       <button onclick="MS.toggleTheme();MS.closeMenu()">🌙 Light / Dark</button>
       <button onclick="MS.shareEmpty();MS.closeMenu()">📭 Share empty sheet to a coach</button>
       <button onclick="MS.exportSCIOS();MS.closeMenu()">↗ Export for SCIOS platform</button>
@@ -1482,12 +1489,12 @@ const MS = {
       // XI list: position group (GKP/DEF/MID/ATT) + number + name + the player's own events.
       const xiList=s.xi.map((p,i)=>{
         const grp=this.positionGroup(f.pos[i]);
-        return `<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${grp}</span>${esc(shortName(p.name))}${this.eventTags(ev[p.id])}</div>`;
+        return `<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${grp}</span><span class="ps-name">${esc(shortName(p.name))}</span>${this.eventTags(ev[p.id])}</div>`;
       }).join('');
       // Bench: everyone in the squad not in the XI, with their events (who came on, cards…).
       const xiIds=new Set(s.xi.map(p=>p.id));
       const benchList=s.roster.filter(p=>!xiIds.has(p.id))
-        .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span>${esc(shortName(p.name))}${this.eventTags(ev[p.id])}</div>`).join('');
+        .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-name">${esc(shortName(p.name))}</span>${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
         const tag=g.kind==='P'?' (Penalty)':g.kind==='OG'?' (Own Goal)':'';
