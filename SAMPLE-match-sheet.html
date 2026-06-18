@@ -1,0 +1,59 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>AEK U17 vs AEL U17 — SCIOS Match Sheet (Sample)</title><style>
+@page{size:A4 portrait;margin:10mm 9mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}
+body{font-family:Inter,Arial,sans-serif;background:#eee;margin:0;padding:20px}#sheet{background:#fff;max-width:780px;margin:0 auto;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.note{max-width:780px;margin:0 auto 14px;font:14px Inter,Arial;color:#333;background:#fff;padding:12px 16px;border-radius:8px}
+
+    @page{size:A4 portrait;margin:10mm 9mm}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{background:#fff;color:#111}
+    /* hide ALL the app UI; show only the dedicated print sheet */
+    header.app,.tabs,main,.no-print{display:none!important}
+    #printSheet{display:block!important}
+
+    .ps-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0A1628;padding-bottom:6px;margin-bottom:10px}
+    .ps-logo{height:48px;width:auto}
+    .ps-score{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
+    .ps-score .ps-hn,.ps-score .ps-an{font-size:16px}
+    .ps-score .ps-sc{font-size:22px;color:#1f4ed8}
+    .ps-date{font-size:13px;font-weight:700;color:#3A5070}
+
+    /* Portrait split into 2 columns: Home (left) | Away (right) */
+    .ps-body{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ps-team{border:1px solid #C8D4EC;border-radius:8px;padding:10px;break-inside:avoid;display:flex;flex-direction:column}
+    .ps-tname{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:800;margin-bottom:8px}
+    .ps-tname .ps-form{margin-left:auto;font-size:12px;font-weight:700;color:#1f4ed8}
+    .ps-tname .crest-lg{width:24px;height:24px}
+
+    /* Within each team, stacked vertically: pitch (top) → lineup → subs */
+    .ps-pitch{position:relative;height:330px;border:1.5px solid rgba(255,255,255,.7);border-radius:6px;
+      background:repeating-linear-gradient(0deg,#3a9a4e 0 12.5%,#359045 12.5% 25%);margin-bottom:8px;overflow:hidden}
+    /* pitch markings for the printed sheet */
+    .ps-halfway{position:absolute;left:0;right:0;top:50%;height:1.5px;background:rgba(255,255,255,.7)}
+    .ps-circle{position:absolute;left:50%;top:50%;width:24%;aspect-ratio:1;transform:translate(-50%,-50%);
+      border:1.5px solid rgba(255,255,255,.7);border-radius:50%}
+    .ps-box{position:absolute;left:50%;transform:translateX(-50%);width:46%;height:15%;
+      border:1.5px solid rgba(255,255,255,.7)}
+    .ps-box-top{top:0;border-top:none}.ps-box-bot{bottom:0;border-bottom:none}
+    .ps-spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:74px;z-index:2}
+    .ps-dot{display:flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 auto;
+      border-radius:50%;background:#8B5CF6;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
+    .ps-pitch-home .ps-dot{background:#8B5CF6}  /* home = purple */
+    .ps-pitch-away .ps-dot{background:#EC4899}  /* away = pink */
+    /* show full names — wrap to 2 lines instead of truncating with "…" */
+    .ps-lbl{font-size:8px;line-height:1.05;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;
+      display:block;margin-top:1px;word-break:break-word}
+
+    .ps-xi{font-size:11.5px}
+    .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
+    .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8}
+    .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070}
+    .ps-subs{margin-top:6px;border-top:1px dashed #C8D4EC;padding-top:5px;font-size:11px}
+    .ps-subs-h{font-weight:700;text-transform:uppercase;font-size:10px;color:#3A5070;margin-bottom:3px}
+    .ps-sub{padding:1px 0}
+    .ps-foot{margin-top:8px;text-align:center;font-size:10px;color:#7A90B0}
+    .crest,.crest-lg{display:inline-block}
+@media print{body{background:#fff;padding:0}.note{display:none}#sheet{box-shadow:none;max-width:none}}</style></head><body>
+<div class="note">📄 <b>SCIOS Match Sheet — sample</b>. Press <b>Ctrl+P</b> → Save as PDF (tick "Background graphics", untick "Headers and footers").</div>
+<div id="sheet"><div class="ps-head"><div style="font-weight:800;font-size:20px;color:#06D6F5">SCIOS <span style="color:#0A1628">Match Sheet</span></div><div class="ps-score"><span class="ps-hn">AEK U17</span><span class="ps-sc">2 – 1</span><span class="ps-an">AEL U17</span></div><div class="ps-date">22/05/2026</div></div>
+<div style="text-align:center;font-size:12px;color:#3A5070;margin-bottom:8px">Cyprus U17 League Division 1 · Coach (H): A. Demetriou · Coach (A): M. Ioannou</div>
+<div class="ps-body"><div class="ps-team"><div class="ps-tname">AEK U17 <span class="ps-form">1-4-3-3</span></div><div class="ps-pitch ps-pitch-home"><div class="ps-halfway"></div><div class="ps-circle"></div><div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div><div class="ps-spot" style="left:50%;top:92%"><span class="ps-dot">1</span><span class="ps-lbl">A. Mavrommatis</span></div><div class="ps-spot" style="left:18%;top:74%"><span class="ps-dot">2</span><span class="ps-lbl">C. Kapoulas</span></div><div class="ps-spot" style="left:39%;top:76%"><span class="ps-dot">3</span><span class="ps-lbl">D. Gerasimiou</span></div><div class="ps-spot" style="left:61%;top:76%"><span class="ps-dot">4</span><span class="ps-lbl">D. Michail</span></div><div class="ps-spot" style="left:82%;top:74%"><span class="ps-dot">5</span><span class="ps-lbl">E. Panayiotou</span></div><div class="ps-spot" style="left:30%;top:54%"><span class="ps-dot">6</span><span class="ps-lbl">E. Kyriakou</span></div><div class="ps-spot" style="left:50%;top:56%"><span class="ps-dot">8</span><span class="ps-lbl">G. Constantinou</span></div><div class="ps-spot" style="left:70%;top:54%"><span class="ps-dot">10</span><span class="ps-lbl">G. Filippou</span></div><div class="ps-spot" style="left:22%;top:28%"><span class="ps-dot">7</span><span class="ps-lbl">G. Popov</span></div><div class="ps-spot" style="left:50%;top:22%"><span class="ps-dot">9</span><span class="ps-lbl">K. Alexandrou</span></div><div class="ps-spot" style="left:78%;top:28%"><span class="ps-dot">11</span><span class="ps-lbl">K. Kalliaras</span></div></div><div class="ps-xi"><div class="ps-row"><span class="ps-num">1</span><span class="ps-pos">GK</span>A. Mavrommatis</div><div class="ps-row"><span class="ps-num">2</span><span class="ps-pos">LB</span>C. Kapoulas</div><div class="ps-row"><span class="ps-num">3</span><span class="ps-pos">LCB</span>D. Gerasimiou</div><div class="ps-row"><span class="ps-num">4</span><span class="ps-pos">RCB</span>D. Michail</div><div class="ps-row"><span class="ps-num">5</span><span class="ps-pos">RB</span>E. Panayiotou</div><div class="ps-row"><span class="ps-num">6</span><span class="ps-pos">LCM</span>E. Kyriakou</div><div class="ps-row"><span class="ps-num">8</span><span class="ps-pos">CDM</span>G. Constantinou</div><div class="ps-row"><span class="ps-num">10</span><span class="ps-pos">RCM</span>G. Filippou</div><div class="ps-row"><span class="ps-num">7</span><span class="ps-pos">LW</span>G. Popov</div><div class="ps-row"><span class="ps-num">9</span><span class="ps-pos">ST</span>K. Alexandrou</div><div class="ps-row"><span class="ps-num">11</span><span class="ps-pos">RW</span>K. Kalliaras</div></div><div class="ps-subs"><div class="ps-subs-h">Substitutions</div><div class="ps-sub"><b>61'</b> ↓ G. Popov ↑ A. Misielis</div><div class="ps-sub"><b>75'</b> ↓ K. Alexandrou ↑ C. Charalampous</div></div></div><div class="ps-team"><div class="ps-tname">AEL U17 <span class="ps-form">1-4-4-2</span></div><div class="ps-pitch ps-pitch-away"><div class="ps-halfway"></div><div class="ps-circle"></div><div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div><div class="ps-spot" style="left:50%;top:92%"><span class="ps-dot">1</span><span class="ps-lbl">A. Kleovoulou</span></div><div class="ps-spot" style="left:18%;top:74%"><span class="ps-dot">2</span><span class="ps-lbl">A. Panayi</span></div><div class="ps-spot" style="left:39%;top:76%"><span class="ps-dot">3</span><span class="ps-lbl">A. Charalampides</span></div><div class="ps-spot" style="left:61%;top:76%"><span class="ps-dot">4</span><span class="ps-lbl">C. Neofitidis</span></div><div class="ps-spot" style="left:82%;top:74%"><span class="ps-dot">5</span><span class="ps-lbl">C. Karamanis</span></div><div class="ps-spot" style="left:16%;top:50%"><span class="ps-dot">6</span><span class="ps-lbl">D. Christou</span></div><div class="ps-spot" style="left:39%;top:52%"><span class="ps-dot">7</span><span class="ps-lbl">D. Theokli</span></div><div class="ps-spot" style="left:61%;top:52%"><span class="ps-dot">8</span><span class="ps-lbl">G. Zeniou</span></div><div class="ps-spot" style="left:84%;top:50%"><span class="ps-dot">9</span><span class="ps-lbl">G. Neophytou</span></div><div class="ps-spot" style="left:38%;top:26%"><span class="ps-dot">10</span><span class="ps-lbl">G. Panagiotou</span></div><div class="ps-spot" style="left:62%;top:26%"><span class="ps-dot">11</span><span class="ps-lbl">L. Orfanidis</span></div></div><div class="ps-xi"><div class="ps-row"><span class="ps-num">1</span><span class="ps-pos">GK</span>A. Kleovoulou</div><div class="ps-row"><span class="ps-num">2</span><span class="ps-pos">LB</span>A. Panayi</div><div class="ps-row"><span class="ps-num">3</span><span class="ps-pos">LCB</span>A. Charalampides</div><div class="ps-row"><span class="ps-num">4</span><span class="ps-pos">RCB</span>C. Neofitidis</div><div class="ps-row"><span class="ps-num">5</span><span class="ps-pos">RB</span>C. Karamanis</div><div class="ps-row"><span class="ps-num">6</span><span class="ps-pos">LW</span>D. Christou</div><div class="ps-row"><span class="ps-num">7</span><span class="ps-pos">LDM</span>D. Theokli</div><div class="ps-row"><span class="ps-num">8</span><span class="ps-pos">RDM</span>G. Zeniou</div><div class="ps-row"><span class="ps-num">9</span><span class="ps-pos">RW</span>G. Neophytou</div><div class="ps-row"><span class="ps-num">10</span><span class="ps-pos">LS</span>G. Panagiotou</div><div class="ps-row"><span class="ps-num">11</span><span class="ps-pos">RS</span>L. Orfanidis</div></div><div class="ps-subs"><div class="ps-subs-h">Substitutions</div><div class="ps-sub"><b>68'</b> ↓ G. Neophytou ↑ N. Charalambous</div></div></div></div><div class="ps-foot">Generated by SCIOS Match Sheet · matchsheet.scienceofsports.net</div></div></body></html>

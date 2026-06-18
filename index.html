@@ -268,13 +268,14 @@
     .ps-box{position:absolute;left:50%;transform:translateX(-50%);width:46%;height:15%;
       border:1.5px solid rgba(255,255,255,.7)}
     .ps-box-top{top:0;border-top:none}.ps-box-bot{bottom:0;border-bottom:none}
-    .ps-spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:50px;z-index:2}
+    .ps-spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:74px;z-index:2}
     .ps-dot{display:flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 auto;
       border-radius:50%;background:#8B5CF6;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
     .ps-pitch-home .ps-dot{background:#8B5CF6}  /* home = purple */
     .ps-pitch-away .ps-dot{background:#EC4899}  /* away = pink */
-    .ps-lbl{font-size:8.5px;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;white-space:nowrap;
-      overflow:hidden;text-overflow:ellipsis;display:block}
+    /* show full names — wrap to 2 lines instead of truncating with "…" */
+    .ps-lbl{font-size:8px;line-height:1.05;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;
+      display:block;margin-top:1px;word-break:break-word}
 
     .ps-xi{font-size:11.5px}
     .ps-row{display:flex;gap:6px;padding:1.5px 0;break-inside:avoid}
