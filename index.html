@@ -36,6 +36,44 @@
   .datewrap{position:relative;display:inline-block}
   .datewrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;
     border:none;padding:0;margin:0;cursor:pointer;min-height:0}
+  /* ••• overflow menu in the header */
+  .menu-wrap{position:relative}
+  .menu{position:absolute;right:0;top:46px;background:var(--surface2);border:1px solid var(--border);
+    border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:6px;display:none;z-index:50;min-width:230px}
+  .menu.open{display:block}
+  .menu button{display:block;width:100%;text-align:left;background:transparent;color:var(--text);
+    border:none;border-radius:6px;padding:11px 12px;font-size:15px;font-weight:600}
+  .menu button:hover{background:var(--surface3)}
+
+  /* collapsed fixture picker (after a fixture is loaded) */
+  #fixtureCard.collapsed .segrow,#fixtureCard.collapsed .row,#fixtureCard.collapsed > label{display:none}
+  #fixtureCard.collapsed #fixPickStatus{margin:0}
+  #fixtureCard.collapsed::after{content:"⟳ Change fixture";display:inline-block;margin-top:6px;
+    color:var(--accent);font-size:13px;font-weight:600;cursor:pointer}
+
+  /* segmented tap-buttons (Type / Gender) — instant, no native picker */
+  .segrow{display:flex;gap:10px;flex-wrap:wrap}
+  .seg{display:flex;flex:1;border:1px solid var(--border);border-radius:9px;overflow:hidden;min-width:160px}
+  .segbtn{flex:1;background:var(--surface2);color:var(--text2);border:none;border-radius:0;
+    padding:11px 8px;font-size:15px;font-weight:600;min-height:44px}
+  .segbtn+.segbtn{border-left:1px solid var(--border)}
+  .segbtn.on{background:var(--accent);color:#fff}
+  .segbtn:hover:not(.on){color:var(--text)}
+
+  /* club folders in Teams & Rosters */
+  .club{background:var(--surface1);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden}
+  .club.open{border-color:var(--accent)}
+  .club-head{display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:var(--text);
+    border:none;border-radius:0;padding:13px 14px;font-size:16px;font-weight:700;text-align:left}
+  .club-head:hover{background:var(--surface2)}
+  .club-head .crest{width:26px;height:26px}
+  .club-name{flex:0 0 auto}
+  .club-meta{color:var(--text2);font-size:12px;font-weight:600}
+  .club-arrow{margin-left:auto;color:var(--accent);font-size:14px}
+  .club-body{padding:0 14px 12px}
+  .teamblock{border-top:1px solid var(--border);padding-top:12px;margin-top:4px}
+  .teamblock h4{font-size:15px;font-weight:700}
+
   /* compact match strip — hidden on desktop (editor always shown); shown on mobile */
   .matchstrip{display:none;width:100%;align-items:center;gap:8px;background:transparent;
     color:var(--text);border:none;padding:4px;font-size:16px;font-weight:600;min-height:auto}
@@ -96,7 +134,7 @@
 
   /* formation pitch — green with mowing stripes */
   .pitch{position:relative;border:1px solid rgba(255,255,255,.25);border-radius:10px;
-    aspect-ratio:68/52;overflow:hidden;
+    aspect-ratio:68/64;overflow:hidden;
     background:
       repeating-linear-gradient(0deg, #2e8b40 0 12.5%, #2a8139 12.5% 25%);}
   .pitch .line{position:absolute;background:rgba(255,255,255,.55)}
@@ -106,16 +144,21 @@
   .pitch .box{position:absolute;left:50%;transform:translateX(-50%);
     width:50%;height:16%;border:2px solid rgba(255,255,255,.55)}
   .pitch .box.top{top:0;border-top:none}.pitch .box.bot{bottom:0;border-bottom:none}
-  .spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:64px;cursor:pointer}
-  .spot .dot{width:34px;height:34px;margin:0 auto;border-radius:50%;
-    background:linear-gradient(160deg,#0b2f6b,#1f4ed8);
-    color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;
-    border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);transition:transform .1s}
-  .spot.sel .dot{background:var(--amber);transform:scale(1.18);border-color:#fff;
+  .spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:120px;cursor:pointer}
+  .spot .dot{width:64px;height:64px;margin:0 auto;border-radius:50%;
+    background:#8B5CF6;  /* default/home — SCIOS purple */
+    color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:23px;
+    border:3px solid #fff;box-shadow:0 2px 9px rgba(0,0,0,.5);transition:transform .1s}
+  /* home = purple, away = pink — matching the SCIOS platform match view */
+  .pitch-home .spot .dot{background:#8B5CF6}
+  .pitch-away .spot .dot{background:#EC4899}
+  .spot.sel .dot{background:var(--amber)!important;transform:scale(1.18);border-color:#fff;
     box-shadow:0 0 0 3px var(--amber),0 2px 8px rgba(0,0,0,.6)}
   .spot:active .dot{transform:scale(1.1)}
-  .spot .lbl{font-size:10px;margin-top:2px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000;
+  .spot .lbl{font-size:15px;margin-top:5px;color:#fff;font-weight:700;text-shadow:0 1px 3px #000;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* desktop: show full "C. Charalambides"; mobile: surname only (see media query) */
+  .spot .lbl-short{display:none}
 
   /* brand logo in header */
   .brand-logo{height:44px;width:auto;display:block}
@@ -172,9 +215,11 @@
 
     /* bigger pitch dots / labels on the formation view */
     .pitch{aspect-ratio:5/6}            /* taller pitch reads better on a phone */
-    .spot{width:58px}
-    .spot .dot{width:40px;height:40px;font-size:16px}
-    .spot .lbl{font-size:11px}
+    .spot{width:84px}                   /* wide enough for long surnames on one line */
+    .spot .dot{width:42px;height:42px;font-size:16px}
+    .spot .lbl{font-size:10.5px}        /* fits e.g. Christodoulou */
+    .spot .lbl-full{display:none}    /* mobile: hide initial+surname */
+    .spot .lbl-short{display:inline} /* mobile: show surname only */
 
     /* substitutions: stack the controls so they never overflow */
     .sub-row{gap:6px}
@@ -225,7 +270,9 @@
     .ps-box-top{top:0;border-top:none}.ps-box-bot{bottom:0;border-bottom:none}
     .ps-spot{position:absolute;transform:translate(-50%,-50%);text-align:center;width:50px;z-index:2}
     .ps-dot{display:flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 auto;
-      border-radius:50%;background:#1f4ed8;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
+      border-radius:50%;background:#8B5CF6;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
+    .ps-pitch-home .ps-dot{background:#8B5CF6}  /* home = purple */
+    .ps-pitch-away .ps-dot{background:#EC4899}  /* away = pink */
     .ps-lbl{font-size:8.5px;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis;display:block}
 
@@ -247,12 +294,18 @@
   <img id="brandLogo" class="brand-logo" src="logos/Logo-scios-dark.png" alt="Science of Sports" />
   <div class="logo-sub">Match Sheet</div>
   <div class="spacer"></div>
-  <button class="btn-ghost no-print" id="themeBtn" onclick="MS.toggleTheme()" title="Switch light / dark">🌙</button>
+  <!-- Coach-facing actions only; technical/admin items live in the ••• menu -->
   <button class="btn-ghost no-print" onclick="MS.newSheet()">New</button>
   <button class="btn-ghost no-print" onclick="MS.saveSheet()">Save</button>
-  <button class="btn-ghost no-print" onclick="MS.exportSCIOS()" title="Export lineup JSON for the SCIOS platform">↗ SCIOS</button>
   <button class="btn-ghost no-print" onclick="MS.share()" title="Share to WhatsApp / email">📲 Share</button>
   <button class="btn-primary no-print" onclick="MS.exportPDF()">Export PDF</button>
+  <div class="menu-wrap no-print">
+    <button class="btn-ghost" onclick="MS.toggleMenu(event)" title="More">⋯</button>
+    <div class="menu" id="hdrMenu">
+      <button onclick="MS.toggleTheme();MS.closeMenu()">🌙 Light / Dark</button>
+      <button onclick="MS.exportSCIOS();MS.closeMenu()">↗ Export for SCIOS platform</button>
+    </div>
+  </div>
 </header>
 
 <div class="tabs no-print">
@@ -267,13 +320,22 @@
     <div id="draftNote" class="hint no-print" style="display:none;color:var(--green);margin-bottom:8px">
       ↩︎ Restored your last in-progress sheet. Press <b>New</b> to start fresh.
     </div>
-    <div class="card" id="fixtureCard" style="display:none">
+    <div class="card" id="fixtureCard" style="display:none" onclick="if(this.classList.contains('collapsed'))MS.reopenFixtures()">
       <label>Load a fixture (auto-fills teams &amp; date)</label>
-      <div class="row" style="margin-top:4px">
-        <select id="fixType" onchange="MS.onFixType()" style="flex:1.4;min-width:150px"></select>
-        <select id="fixGender" onchange="MS.onFixType()" style="flex:1;min-width:100px"></select>
-        <select id="fixComp" onchange="MS.onFixComp(this.value)" style="flex:1.6;min-width:160px"></select>
-        <select id="fixMatch" onchange="MS.loadFixture(this.value)" style="flex:3;min-width:240px"></select>
+      <!-- Type + Gender as instant tap-buttons (no slow native dropdown) -->
+      <div class="segrow" style="margin-top:6px">
+        <div class="seg" id="segType">
+          <button class="segbtn" data-v="Club Competitions" onclick="MS.setFixType('Club Competitions')">🏟️ Club</button>
+          <button class="segbtn" data-v="National Teams" onclick="MS.setFixType('National Teams')">🌍 National</button>
+        </div>
+        <div class="seg" id="segGender">
+          <button class="segbtn" data-v="Men" onclick="MS.setFixGender('Men')">Men</button>
+          <button class="segbtn" data-v="Women" onclick="MS.setFixGender('Women')">Women</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="fixComp" onchange="MS.onFixComp(this.value)" style="flex:1.4;min-width:150px"></select>
+        <select id="fixMatch" onchange="MS.loadFixture(this.value)" style="flex:3;min-width:220px"></select>
       </div>
       <div id="fixPickStatus" class="hint"></div>
     </div>
@@ -351,6 +413,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device.</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
+      <input id="teamSearch" placeholder="🔍 Search club…" oninput="MS.setTeamFilter(this.value)" style="width:100%;margin-top:10px" />
     </div>
     <div id="teamsEditor"></div>
   </section>
@@ -359,6 +422,7 @@
   <section id="tab-saved" style="display:none">
     <div class="card">
       <h2>Saved Match Sheets</h2>
+      <input id="savedSearch" placeholder="🔍 Search team or date…" oninput="MS.setSavedFilter(this.value)" style="width:100%;margin:10px 0" />
       <div id="savedList"></div>
     </div>
   </section>
@@ -580,31 +644,36 @@ const MS = {
     if(/european qualifiers/i.test(name)) return age+' (Euro Qualifiers)';
     return age;
   },
+  _fixType:'Club Competitions', _fixGender:'Men',   // sensible defaults (Marios's usual)
   refreshFixturePicker(){
     const card=document.getElementById('fixtureCard');
     const has=this.data.fixtures.length>0;
     card.style.display = has ? '' : 'none';
     if(!has) return;
-    document.getElementById('fixType').innerHTML=
-      '<option value="">— select type —</option>'
-      + '<option value="Club Competitions">🏟️ Club Competitions</option>'
-      + '<option value="National Teams">🌍 National Teams</option>';
-    document.getElementById('fixGender').innerHTML=
-      '<option value="Men">Men</option><option value="Women">Women</option>';
-    document.getElementById('fixComp').innerHTML='<option value="">competition</option>';
+    this._syncSeg();
+    this.onFixType();   // populate the competition list right away for the default type
     document.getElementById('fixMatch').innerHTML='<option value="">match</option>';
   },
+  // reflect the current Type/Gender selection on the tap-buttons
+  _syncSeg(){
+    document.querySelectorAll('#segType .segbtn').forEach(b=>b.classList.toggle('on', b.dataset.v===this._fixType));
+    document.querySelectorAll('#segGender .segbtn').forEach(b=>b.classList.toggle('on', b.dataset.v===this._fixGender));
+  },
+  setFixType(v){ this._fixType=v; this._syncSeg(); this.onFixType(); },
+  setFixGender(v){ this._fixGender=v; this._syncSeg(); this.onFixType(); },
   // Fixtures matching the current Type + Gender selection.
   _fixScope(){
-    const type=document.getElementById('fixType').value;
-    const gender=document.getElementById('fixGender').value||'Men';
+    const type=this._fixType, gender=this._fixGender||'Men';
     return this.data.fixtures.filter(f=>this.compType(f.comp)===type && this.compGender(f.comp)===gender);
   },
   onFixType(){
     // For National Teams the Competition dropdown lists ONE entry per age group
-    // (U15…U21, Senior) — matching the platform's national-team cards. Club
-    // Competitions list per league (each age is a single league anyway).
-    const type=document.getElementById('fixType').value;
+    // (U15…U21, Senior) — matching the platform's national-team cards.
+    if(!this._fixType){ // type not chosen yet
+      document.getElementById('fixComp').innerHTML='<option value="">— pick Club or National above —</option>';
+      document.getElementById('fixMatch').innerHTML='<option value="">match</option>';
+      return;
+    }
     const scope=this._fixScope();
     const ages=[...new Set(scope.map(f=>this.compAge(f.comp)))]
       .sort((a,b)=>{
@@ -649,8 +718,15 @@ const MS = {
     const st=document.getElementById('fixPickStatus');
     if(missing.length){ st.style.color='var(--amber)';
       st.textContent='Loaded. No imported roster for: '+missing.join(', ')+' — add/import that team to fill its squad.'; }
-    else { st.style.color='var(--green)'; st.textContent='Loaded '+f.home+' vs '+f.away+(f.date?' ('+f.date+')':'')+'.'; }
+    else { st.style.color='var(--green)'; st.textContent='✓ Loaded — date & teams filled. Tap players below to build the XI.'; }
+    // Collapse the setup (fixture + match editor) so the coach goes straight to the pitch.
+    const fc=document.getElementById('fixtureCard'); if(fc) fc.classList.add('collapsed');
+    document.querySelector('.matchcard').classList.remove('editor-open');
+    // scroll to the home team panel (the work area)
+    setTimeout(()=>{ const el=document.getElementById('homePanel'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 100);
   },
+  // Re-open the fixture picker (after it auto-collapses)
+  reopenFixtures(){ const fc=document.getElementById('fixtureCard'); if(fc) fc.classList.remove('collapsed'); },
 
   clearAllTeams(){
     if(!this.requireAdmin()) return;
@@ -681,27 +757,61 @@ const MS = {
     p[field]= field==='num'? (parseInt(val)||0) : val;
     this.persist();
   },
+  // Club name = team name without the " U14".." U19" age suffix.
+  clubOf(name){ return String(name||'').replace(/\s+U\d{2}$/,'').trim() || name; },
+  _openClub:null,            // which club folder is expanded
+  _teamFilter:'',            // search box text
+  setTeamFilter(v){ this._teamFilter=(v||'').toLowerCase(); this.renderTeams(); },
+  toggleClub(club){ this._openClub = (this._openClub===club ? null : club); this.renderTeams(); },
+
   renderTeams(){
     const root=document.getElementById('teamsEditor');
-    root.innerHTML = this.data.teams.map(t=>`
-      <div class="card">
-        <div class="row" style="justify-content:space-between">
-          <h3>${esc(t.name)} <span class="xi-count">(${t.players.length})</span></h3>
-          <div class="row">
-            <button class="btn-ghost" onclick="MS.addPlayer('${t.id}')">+ Player</button>
-            <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete team</button>
-          </div>
+    // group teams by club
+    const clubs={};
+    this.data.teams.forEach(t=>{ const c=this.clubOf(t.name); (clubs[c]=clubs[c]||[]).push(t); });
+    let names=Object.keys(clubs).sort((a,b)=>a.localeCompare(b));
+    if(this._teamFilter) names=names.filter(c=>c.toLowerCase().includes(this._teamFilter));
+    if(!names.length){
+      root.innerHTML = this.data.teams.length
+        ? '<div class="empty">No clubs match your search.</div>'
+        : '<div class="empty">No teams yet. Tap <b>🔒 Admin</b> → enter the passcode → <b>Import players (CSV)</b> to load all teams, or <b>Add team</b> manually.</div>';
+      return;
+    }
+    root.innerHTML = names.map(club=>{
+      const teams=clubs[club].sort((a,b)=>a.name.localeCompare(b.name));
+      const open=this._openClub===club;
+      const ageTeams=teams.length;
+      const players=teams.reduce((n,t)=>n+t.players.length,0);
+      return `<div class="club ${open?'open':''}">
+        <button class="club-head" onclick="MS.toggleClub('${esc(club).replace(/'/g,"\\'")}')">
+          ${crestImg(club,'crest')}
+          <span class="club-name">${esc(club)}</span>
+          <span class="club-meta">${ageTeams} team${ageTeams>1?'s':''} · ${players} players</span>
+          <span class="club-arrow">${open?'▾':'▸'}</span>
+        </button>
+        ${open ? `<div class="club-body">${teams.map(t=>this.teamEditorHTML(t)).join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+  },
+  teamEditorHTML(t){
+    return `<div class="teamblock">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h4>${esc(t.name)} <span class="xi-count">(${t.players.length})</span></h4>
+        <div class="row">
+          <button class="btn-ghost" onclick="MS.addPlayer('${t.id}')">+ Player</button>
+          <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete</button>
         </div>
-        <div style="margin-top:10px">
-          ${t.players.map(p=>`
-            <div class="player" style="cursor:default">
-              <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
-              <input class="pname" style="flex:1" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
-              <select style="width:84px" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
-              <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
-            </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
-        </div>
-      </div>`).join('') || '<div class="empty">No teams yet. Tap <b>🔒 Admin</b> → enter the passcode → <b>Import players (CSV)</b> to load all teams, or <b>Add team</b> manually.</div>';
+      </div>
+      <div style="margin-top:8px">
+        ${t.players.map(p=>`
+          <div class="player" style="cursor:default">
+            <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
+            <input class="pname" style="flex:1" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
+            <select style="width:84px" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
+            <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
+          </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
+      </div>
+    </div>`;
   },
 
   // ---------- match sheet build ----------
@@ -768,7 +878,8 @@ const MS = {
   pickTeam(side,teamId){
     const t=this.data.teams.find(x=>x.id===teamId);
     if(!t){ this.cur[side]=null; this.renderSide(side); return; }
-    // deep copy roster into the sheet so per-sheet number edits don't touch the master
+    // copy the roster (carrying each player's remembered shirt number); number edits on
+    // the lineup are persisted back to the master via rememberNumber() so they stick.
     this.cur[side]={
       teamId:t.id, name:t.name, league:t.league||'',
       roster:t.players.map(p=>({...p})),
@@ -823,7 +934,7 @@ const MS = {
           </select>
         </div>
       </div>
-      <div class="pitch" id="pitch-${side}">
+      <div class="pitch pitch-${side}" id="pitch-${side}">
         <div class="line halfway"></div><div class="circle"></div>
         <div class="box top"></div><div class="box bot"></div>
       </div>
@@ -911,7 +1022,7 @@ const MS = {
       const pos=f.pos[i]||'';
       const d=document.createElement('div'); d.className='spot'; d.style.left=x+'%'; d.style.top=y+'%';
       if(this._swapSel && this._swapSel.side===side && this._swapSel.i===i) d.classList.add('sel');
-      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl"><b>${esc(pos)}</b> ${esc(lastName(p.name))}</div>`;
+      d.innerHTML=`<div class="dot">${p.num}</div><div class="lbl"><span class="lbl-full">${esc(shortName(p.name))}</span><span class="lbl-short">${esc(lastName(p.name))}</span></div>`;
       d.onclick=()=>MS.pitchTap(side,i);
       pitch.appendChild(d);
     });
@@ -930,8 +1041,18 @@ const MS = {
   },
   setFormation(side,f){ this.cur[side].formation=f; this.renderSide(side); this.touch(); },
   setNum(side,pid,val){
-    const p=this.cur[side].roster.find(p=>p.id===pid); if(p){p.num=parseInt(val)||0;}
+    const n=parseInt(val)||0;
+    const p=this.cur[side].roster.find(p=>p.id===pid);
+    if(p){ p.num=n; this.rememberNumber(this.cur[side].teamId, p, n); }
     this.renderPitch(side); this.touch();
+  },
+  // Persist a player's shirt number back to the master roster so it's the default next time.
+  // Numbers are "sticky": each game's number becomes the player's default until changed again.
+  rememberNumber(teamId, player, num){
+    const team=this.data.teams.find(t=>t.id===teamId); if(!team) return;
+    // match by source id (stable) first, else by the local id
+    const master=team.players.find(mp=>(player.srcId&&mp.srcId===player.srcId)||mp.id===player.id);
+    if(master && master.num!==num){ master.num=num; this.persist(); }
   },
 
   // drag & drop
@@ -1021,10 +1142,20 @@ const MS = {
     document.getElementById('matchDate').value=todayDDMMYYYY();
     this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
   },
+  // key for one-sheet-per-matchup (home vs away, case-insensitive)
+  matchupKey(home,away){ return ((home||'')+' vs '+(away||'')).toLowerCase(); },
   saveSheet(){
     if(!this.cur.home||!this.cur.away){ alert('Pick both teams first.'); return; }
     const sheet=this.currentSheet();
     sheet.id=this.curId||crypto.randomUUID();
+    const key=this.matchupKey(sheet.home&&sheet.home.name, sheet.away&&sheet.away.name);
+    // Only ONE sheet per matchup: replace any existing sheet for the same Home-vs-Away.
+    const existing=this.data.sheets.findIndex(s=>
+      this.matchupKey(s.home&&s.home.name, s.away&&s.away.name)===key && s.id!==sheet.id);
+    if(existing>=0){
+      if(!confirm(`A saved sheet for ${sheet.home.name} vs ${sheet.away.name} already exists. Replace it?`)) return;
+      this.data.sheets.splice(existing,1);
+    }
     const idx=this.data.sheets.findIndex(s=>s.id===sheet.id);
     if(idx>=0) this.data.sheets[idx]=sheet; else this.data.sheets.push(sheet);
     this.curId=sheet.id; this._dirty=false; this.persist();
@@ -1046,9 +1177,21 @@ const MS = {
     if(!confirm('Delete this saved sheet?'))return;
     this.data.sheets=this.data.sheets.filter(s=>s.id!==id); this.persist(); this.renderSaved();
   },
+  _savedFilter:'',
+  setSavedFilter(v){ this._savedFilter=(v||'').toLowerCase(); this.renderSaved(); },
   renderSaved(){
     const root=document.getElementById('savedList');
-    const list=[...this.data.sheets].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
+    let list=[...this.data.sheets].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
+    if(this._savedFilter){
+      const q=this._savedFilter;
+      list=list.filter(s=>((s.home&&s.home.name||'')+' '+(s.away&&s.away.name||'')+' '+(s.date||'')).toLowerCase().includes(q));
+    }
+    if(!list.length){
+      root.innerHTML = this.data.sheets.length
+        ? '<div class="empty">No saved sheets match your search.</div>'
+        : '<div class="empty">No saved sheets yet. Build one and press Save.</div>';
+      return;
+    }
     root.innerHTML=list.map(s=>`
       <div class="saved-item">
         ${crestImg(s.home.name,'crest')}
@@ -1059,7 +1202,7 @@ const MS = {
         ${crestImg(s.away.name,'crest')}
         <button class="btn-ghost" onclick="MS.loadSheet('${s.id}')">Open</button>
         <button class="btn-danger" onclick="MS.delSheet('${s.id}')">Delete</button>
-      </div>`).join('') || '<div class="empty">No saved sheets yet. Build one and press Save.</div>';
+      </div>`).join('');
   },
 
   // ---------- export ----------
@@ -1093,7 +1236,7 @@ const MS = {
     // Always render the date as DD/MM/YYYY on the document, whatever was typed/loaded.
     const d=normDate(document.getElementById('matchDate').value||'');
     const hs=document.getElementById('homeScore').value, as=document.getElementById('awayScore').value;
-    const teamCol=(s)=>{
+    const teamCol=(s,side)=>{
       if(!s) return '<div class="ps-team"><div class="ps-tname">—</div></div>';
       const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
       const spots=s.xi.slice(0,11).map((p,i)=>{
@@ -1108,7 +1251,7 @@ const MS = {
       }).join('');
       return `<div class="ps-team">
         <div class="ps-tname">${crestImg(s.name,'crest-lg')}${esc(s.name)} <span class="ps-form">${fmtFormation(s.formation)}</span></div>
-        <div class="ps-pitch">
+        <div class="ps-pitch ps-pitch-${side}">
           <div class="ps-halfway"></div><div class="ps-circle"></div>
           <div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div>
           ${spots}
@@ -1130,8 +1273,8 @@ const MS = {
         <div class="ps-date">${esc(d)}</div>
       </div>
       <div class="ps-body">
-        ${teamCol(this.cur.home)}
-        ${teamCol(this.cur.away)}
+        ${teamCol(this.cur.home,'home')}
+        ${teamCol(this.cur.away,'away')}
       </div>
       <div class="ps-foot">Generated by SCIOS Match Sheet · matchsheet.scienceofsports.net</div>`;
   },
@@ -1307,6 +1450,9 @@ const MS = {
     const cur=document.documentElement.getAttribute('data-theme')||'dark';
     this.applyTheme(cur==='dark'?'light':'dark');
   },
+  // ---------- header ••• menu ----------
+  toggleMenu(e){ if(e)e.stopPropagation(); document.getElementById('hdrMenu').classList.toggle('open'); },
+  closeMenu(){ const m=document.getElementById('hdrMenu'); if(m) m.classList.remove('open'); },
 
   init(){
     this.applyTheme(localStorage.getItem('scios_ms_theme')||'dark');
@@ -1321,6 +1467,8 @@ const MS = {
       const b=document.getElementById('draftNote');
       if(b) b.style.display='';
     }
+    // close the ••• menu when clicking elsewhere
+    document.addEventListener('click', e=>{ if(!e.target.closest('.menu-wrap')) this.closeMenu(); });
   }
 };
 function parseCSV(text){
@@ -1358,6 +1506,12 @@ function todayDDMMYYYY(){
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function lastName(n){const p=String(n||'').trim().split(' ');return p[p.length-1];}
+// "Constantinos Charalambides" → "C. Charalambides" (first initial + surname)
+function shortName(n){
+  const p=String(n||'').trim().split(/\s+/).filter(Boolean);
+  if(p.length<2) return p[0]||'';
+  return p[0][0].toUpperCase()+'. '+p[p.length-1];
+}
 // "4-4-2" → "1-4-4-2"; "3-5-2 (DM)" → "1-3-5-2 (DM)"
 function fmtFormation(f){ return String(f||'').replace(/^(\d)/,'1-$1'); }
 // <option> list for the rosters position dropdown, grouped, with `sel` pre-selected.
@@ -1373,21 +1527,32 @@ function posOptionsHTML(sel){
 
 // ---- team logos ----
 // Known logo files in logos/ (base names, .png). Used to resolve a team → crest.
-const LOGO_FILES=["AEK","AEL","AEZ","APEA","APOEL","ASIL","Achyronas","Anorthosis","Apollon","Aris","Armenia","Ayia Napa","Chalkanoras","Cyprus","Digenis","Doxa","ENP","Ethnikos Achnas","Ethnikos Assias","Ethnikos Latsion","Finland","Iraklis","Karmiotissa","Kazakhstan","Kosovo","Lithuania","MEAP","Nea Salamina","Netherlands","North Macedonia","Northern Ireland","Olympiakos","Omonoia 29M","Omonoia","PAEEK","Pafos","Republic of Ireland","Romania","San Marino","Spain","Spartakos"];
+const LOGO_FILES=["AEK","AEL","AEZ","APEA","APOEL","APOP","ASIL","Achyronas","Alki","Anagennisi","Anorthosis","Apollon","Aris","Armenia","Ayia Napa","Chalkanoras","Cyprus","Digenis","Doxa","ENP","Ethnikos Achnas","Ethnikos Assias","Ethnikos Latsion","Finland","Iraklis","Karmiotissa","Kazakhstan","Kosovo","Lithuania","MEAP","Nea Salamina","Netherlands","North Macedonia","Northern Ireland","Ermis","Olympiakos","Omonoia 29M","Omonoia","Othellos","PAEEK","Pafos","Peyia","Republic of Ireland","Romania","San Marino","Spain","Spartakos"];
 // Spelling variants in team data → logo file base name.
-const LOGO_ALIASES={"omonia":"Omonoia","omonia nicosia":"Omonoia","omonoia nicosia":"Omonoia","omonia aradippou":"Omonoia 29M","ethnikos":"Ethnikos Achnas"};
+const LOGO_ALIASES={"omonia":"Omonoia","omonia nicosia":"Omonoia","omonoia nicosia":"Omonoia","omonia aradippou":"Omonoia 29M","ethnikos":"Ethnikos Achnas",
+  // full club names → uploaded logo file (short names / spelling variants)
+  "apop polis chrysochous":"APOP","apop":"APOP",
+  "alki oroklini":"Alki","alki oroklini (-2023)":"Alki","alki":"Alki",
+  "anagennisi derynias":"Anagennisi","anagennisi":"Anagennisi",
+  "pegia 2014":"Peyia","pegia 2014 (-2025)":"Peyia","pegia":"Peyia","peyia":"Peyia",
+  "ermis aradippou":"Ermis","ermis":"Ermis",
+  "othellos athienou":"Othellos","othellos":"Othellos",
+  "enppi":"ENP"};
 const _logoLower={}; LOGO_FILES.forEach(f=>_logoLower[f.toLowerCase()]=f);
+// Logos that are NOT .png (most are png; these are jpg).
+const LOGO_EXT={"Othellos":"jpg"};
+function logoPath(base){ return 'logos/'+base+'.'+(LOGO_EXT[base]||'png'); }
 function teamLogo(name){
   if(!name) return null;
   // strip age suffix (U14..U21) and extra whitespace
   let base=String(name).replace(/\bU\d{2}\b/gi,'').replace(/\s+/g,' ').trim();
   const key=base.toLowerCase();
-  if(LOGO_ALIASES[key]) return 'logos/'+LOGO_ALIASES[key]+'.png';
-  if(_logoLower[key]) return 'logos/'+_logoLower[key]+'.png';
+  if(LOGO_ALIASES[key]) return logoPath(LOGO_ALIASES[key]);
+  if(_logoLower[key]) return logoPath(_logoLower[key]);
   // try first word (e.g. "Apollon Limassol" → "Apollon")
   const first=key.split(' ')[0];
-  if(LOGO_ALIASES[first]) return 'logos/'+LOGO_ALIASES[first]+'.png';
-  if(_logoLower[first]) return 'logos/'+_logoLower[first]+'.png';
+  if(LOGO_ALIASES[first]) return logoPath(LOGO_ALIASES[first]);
+  if(_logoLower[first]) return logoPath(_logoLower[first]);
   return null;
 }
 // crest <img> with graceful hide if the file is missing
