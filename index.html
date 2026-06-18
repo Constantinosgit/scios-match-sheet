@@ -163,8 +163,9 @@
   /* event markers on a pitch spot: goal ⚽, card, ↓ sub-off minute */
   .spot .spot-ev{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:2px;line-height:1}
   .spot .spot-ev span{font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px #000}
-  .spot .ev-off{color:#ffd2cc}
-  .spot .ev-card{padding:0 3px;border-radius:3px;text-shadow:none}
+  .spot .ev-card,.spot .ev-off,.spot .ev-on{padding:0 4px;border-radius:3px;text-shadow:none}
+  .spot .ev-off{background:#D7263D;color:#fff}   /* subbed OFF — red pill */
+  .spot .ev-on{background:#10B981;color:#fff}    /* came ON — green pill */
   .spot .ev-card-y{background:#F4C20D;color:#3a2f00}
   .spot .ev-card-r{background:#D7263D;color:#fff}
 
@@ -291,8 +292,10 @@
     /* event markers on a PDF pitch spot: goal ⚽, card, ↓ sub-off minute */
     .ps-spot .spot-ev{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:1px;line-height:1}
     .ps-spot .spot-ev span{font-size:7.5px;font-weight:800}
-    .ps-spot .ev-goal,.ps-spot .ev-off{color:#fff;text-shadow:0 1px 2px #000}
-    .ps-spot .ev-card{padding:0 2px;border-radius:2px}
+    .ps-spot .ev-goal{color:#fff;text-shadow:0 1px 2px #000}
+    .ps-spot .ev-card,.ps-spot .ev-off,.ps-spot .ev-on{padding:0 2px;border-radius:2px}
+    .ps-spot .ev-off{background:#D7263D;color:#fff}   /* subbed OFF — red pill */
+    .ps-spot .ev-on{background:#10B981;color:#fff}    /* came ON — green pill */
     .ps-spot .ev-card-y{background:#F4C20D;color:#3a2f00}
     .ps-spot .ev-card-r{background:#D7263D;color:#fff}
 
