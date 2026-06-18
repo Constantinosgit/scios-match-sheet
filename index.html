@@ -285,6 +285,9 @@
     .ps-subs{margin-top:6px;border-top:1px dashed #C8D4EC;padding-top:5px;font-size:11px}
     .ps-subs-h{font-weight:700;text-transform:uppercase;font-size:10px;color:#3A5070;margin-bottom:3px}
     .ps-sub{padding:1px 0}
+    .ps-coach{font-size:11px;color:#3A5070;margin-top:2px}
+    .ps-coach b{color:#1f2d44}
+    .ps-ref{font-size:11px;font-weight:700;color:#3A5070;margin-top:2px}
     .ps-foot{margin-top:8px;text-align:center;font-size:10px;color:#7A90B0}
     .crest,.crest-lg{display:inline-block}
   }
@@ -371,6 +374,10 @@
             <input class="num" id="homeScore" type="number" min="0" value="0" onchange="MS.touch()" />
             <span style="color:var(--muted)">:</span>
             <input class="num" id="awayScore" type="number" min="0" value="0" onchange="MS.touch()" />
+          </div>
+          <div style="margin-top:8px;text-align:center">
+            <input id="referee" placeholder="Referee" onchange="MS.touch()"
+              style="width:170px;text-align:center" />
           </div>
         </div>
         <div>
@@ -886,7 +893,8 @@ const MS = {
     this.cur[side]={
       teamId:t.id, name:t.name, league:t.league||'',
       roster:t.players.map(p=>({...p})),
-      xi:[], formation:"4-4-2", subs:[]
+      xi:[], formation:"4-4-2", subs:[],
+      coach:t.coach||'', goals:[], cards:[]
     };
     document.getElementById(side+'Name').innerHTML=crestImg(t.name,'crest-lg')+esc(t.name);
     // Offer the team's last saved lineup as a template (XI + formation + numbers).
@@ -919,7 +927,7 @@ const MS = {
     });
     cur.xi = last.team.xi.map(saved=>byId.get(saved.id)).filter(Boolean);
     cur.formation = last.team.formation || cur.formation;
-    cur.subs = []; // subs are match-specific, don't carry over
+    cur.subs = []; cur.goals = []; cur.cards = []; // match-specific, don't carry over
   },
   renderSide(side){
     const panel=document.getElementById(side+'Panel');
@@ -936,6 +944,11 @@ const MS = {
             ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>${fmtFormation(f)}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label style="align-self:center">Coach</label>
+        <input id="coach-${side}" placeholder="Coach name" value="${esc(s.coach||'')}"
+          onchange="MS.setCoach('${side}',this.value)" style="flex:1;min-width:140px">
       </div>
       <div class="pitch pitch-${side}" id="pitch-${side}">
         <div class="line halfway"></div><div class="circle"></div>
@@ -962,6 +975,16 @@ const MS = {
         ${s.subs.length<MAX_SUBS
           ? `<button class="btn-ghost no-print" onclick="MS.addSub('${side}')" style="margin-top:6px">+ Substitution</button>`
           : `<div class="hint no-print" style="margin-top:6px">Maximum ${MAX_SUBS} substitutions reached.</div>`}
+      </div>
+      <div style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Goals <span class="xi-count">${s.goals.length}</span></h3>
+        <div id="goals-${side}">${s.goals.map((g,i)=>this.goalHTML(side,g,i)).join('')}</div>
+        <button class="btn-ghost no-print" onclick="MS.addGoal('${side}')" style="margin-top:6px">+ Goal</button>
+      </div>
+      <div style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Cards <span class="xi-count">${s.cards.length}</span></h3>
+        <div id="cards-${side}">${s.cards.map((c,i)=>this.cardHTML(side,c,i)).join('')}</div>
+        <button class="btn-ghost no-print" onclick="MS.addCard('${side}')" style="margin-top:6px">+ Card</button>
       </div>`;
     this.renderPitch(side);
   },
@@ -1112,6 +1135,67 @@ const MS = {
   },
   delSub(side,i){ this.cur[side].subs.splice(i,1); this.renderSide(side); this.touch(); },
 
+  // ---------- coach (per team, remembered as the team's default) ----------
+  setCoach(side,val){
+    const s=this.cur[side]; if(!s) return;
+    s.coach=val.trim();
+    // Remember as this team's default so it pre-fills next time.
+    const team=this.data.teams.find(t=>t.id===s.teamId);
+    if(team){ team.coach=s.coach; this.persist(); }
+    this.touch();
+  },
+
+  // ---------- goals (scorer + minute + penalty/own-goal flag) ----------
+  // Player <option> list scoped to one team's roster (shared by goals & cards).
+  playerOptions(side,sel){
+    return this.cur[side].roster
+      .map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
+  },
+  goalHTML(side,g,i){
+    return `<div class="sub-row">
+      <input class="min" type="number" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
+      <span class="arrow" style="color:var(--green)">⚽</span>
+      <select onchange="MS.setGoal('${side}',${i},'player',this.value)"><option value="">scorer…</option>${this.playerOptions(side,g.player)}</select>
+      <select class="min" style="width:auto" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
+        <option value="" ${!g.kind?'selected':''}>—</option>
+        <option value="P" ${g.kind==='P'?'selected':''}>P</option>
+        <option value="OG" ${g.kind==='OG'?'selected':''}>OG</option>
+      </select>
+      <button class="btn-danger no-print" onclick="MS.delGoal('${side}',${i})">✕</button>
+    </div>`;
+  },
+  addGoal(side){ this.cur[side].goals.push({min:'',player:'',kind:''}); this.renderSide(side); this.syncScore(); this.touch(); },
+  setGoal(side,i,field,val){
+    this.cur[side].goals[i][field]= field==='min'?(parseInt(val)||''):val;
+    this.syncScore(); this.touch();
+  },
+  delGoal(side,i){ this.cur[side].goals.splice(i,1); this.renderSide(side); this.syncScore(); this.touch(); },
+  // Auto-fill the score boxes from the number of goals logged per team (still hand-editable).
+  syncScore(){
+    if(this.cur.home) document.getElementById('homeScore').value=this.cur.home.goals.length;
+    if(this.cur.away) document.getElementById('awayScore').value=this.cur.away.goals.length;
+    this.updateStrip();
+  },
+
+  // ---------- cards (player + minute + yellow/red) ----------
+  cardHTML(side,c,i){
+    return `<div class="sub-row">
+      <input class="min" type="number" placeholder="min" value="${c.min??''}" onchange="MS.setCard('${side}',${i},'min',this.value)">
+      <select onchange="MS.setCard('${side}',${i},'player',this.value)"><option value="">player…</option>${this.playerOptions(side,c.player)}</select>
+      <select class="min" style="width:auto" onchange="MS.setCard('${side}',${i},'type',this.value)">
+        <option value="Y" ${c.type!=='R'?'selected':''}>🟨 Yellow</option>
+        <option value="R" ${c.type==='R'?'selected':''}>🟥 Red</option>
+      </select>
+      <button class="btn-danger no-print" onclick="MS.delCard('${side}',${i})">✕</button>
+    </div>`;
+  },
+  addCard(side){ this.cur[side].cards.push({min:'',player:'',type:'Y'}); this.renderSide(side); this.touch(); },
+  setCard(side,i,field,val){
+    this.cur[side].cards[i][field]= field==='min'?(parseInt(val)||''):val;
+    this.touch();
+  },
+  delCard(side,i){ this.cur[side].cards.splice(i,1); this.renderSide(side); this.touch(); },
+
   // ---------- save / load sheets ----------
   // Build a snapshot object of the current in-progress sheet.
   currentSheet(){
@@ -1119,6 +1203,7 @@ const MS = {
     return {
       id:this.curId||null,
       date:document.getElementById('matchDate').value,
+      referee:document.getElementById('referee').value,
       homeScore:document.getElementById('homeScore').value,
       awayScore:document.getElementById('awayScore').value,
       home:this.cur.home?JSON.parse(JSON.stringify(this.cur.home)):null,
@@ -1150,9 +1235,10 @@ const MS = {
   restoreDraft(){
     let d; try{ d=JSON.parse(localStorage.getItem('scios_ms_draft')||'null'); }catch(e){}
     if(!d||(!d.home&&!d.away)) return false;
-    this.curId=d.id||null; this.cur.home=d.home||null; this.cur.away=d.away||null;
+    this.curId=d.id||null; this.cur.home=this.normSide(d.home||null); this.cur.away=this.normSide(d.away||null);
     this.league=(d.home&&d.home.league)||'';
     document.getElementById('matchDate').value=normDate(d.date)||todayDDMMYYYY();
+    document.getElementById('referee').value=d.referee||'';
     document.getElementById('homeScore').value=d.homeScore||0;
     document.getElementById('awayScore').value=d.awayScore||0;
     if(d.home) document.getElementById('homeName').innerHTML=crestImg(d.home.name,'crest-lg')+esc(d.home.name);
@@ -1164,6 +1250,7 @@ const MS = {
     this.cur={home:null,away:null}; this.curId=null; this._dirty=false;
     localStorage.removeItem('scios_ms_draft');
     document.getElementById('homeScore').value=0; document.getElementById('awayScore').value=0;
+    document.getElementById('referee').value='';
     document.getElementById('matchDate').value=todayDDMMYYYY();
     this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
   },
@@ -1186,11 +1273,14 @@ const MS = {
     this.curId=sheet.id; this._dirty=false; this.persist();
     alert('Match sheet saved.');
   },
+  // Back-fill fields added in later versions so older saved sheets/drafts still render.
+  normSide(s){ if(s){ s.goals=s.goals||[]; s.cards=s.cards||[]; s.coach=s.coach||''; } return s; },
   loadSheet(id){
     const s=this.data.sheets.find(x=>x.id===id); if(!s)return;
-    this.curId=s.id; this.cur.home=s.home; this.cur.away=s.away;
+    this.curId=s.id; this.cur.home=this.normSide(s.home); this.cur.away=this.normSide(s.away);
     this.league=s.home.league||'';   // restore the competition filter from the saved sheet
     document.getElementById('matchDate').value=normDate(s.date||'');
+    document.getElementById('referee').value=s.referee||'';
     document.getElementById('homeScore').value=s.homeScore||0;
     document.getElementById('awayScore').value=s.awayScore||0;
     document.getElementById('homeName').innerHTML=crestImg(s.home.name,'crest-lg')+esc(s.home.name);
@@ -1276,8 +1366,18 @@ const MS = {
         const on=x.on?(s.roster.find(p=>p.id===x.on)||{}).name:'';
         return `<div class="ps-sub"><b>${x.min||'?'}'</b> ${off?'↓ '+esc(off):''} ${on?'↑ '+esc(on):''}</div>`;
       }).join('');
+      const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
+      const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
+        const tag=g.kind==='P'?' (pen)':g.kind==='OG'?' (o.g.)':'';
+        return `<div class="ps-sub"><b>${g.min||'?'}'</b> ⚽ ${esc(nameOf(g.player))}${tag}</div>`;
+      }).join('');
+      const cards=(s.cards||[]).filter(c=>c.player).map(c=>{
+        const mark=c.type==='R'?'🟥':'🟨';
+        return `<div class="ps-sub"><b>${c.min||'?'}'</b> ${mark} ${esc(nameOf(c.player))}</div>`;
+      }).join('');
       return `<div class="ps-team">
         <div class="ps-tname">${crestImg(s.name,'crest-lg')}${esc(s.name)} <span class="ps-form">${fmtFormation(s.formation)}</span></div>
+        ${s.coach?`<div class="ps-coach"><b>Coach:</b> ${esc(s.coach)}</div>`:''}
         <div class="ps-pitch ps-pitch-${side}">
           <div class="ps-halfway"></div><div class="ps-circle"></div>
           <div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div>
@@ -1285,8 +1385,11 @@ const MS = {
         </div>
         <div class="ps-xi">${xiList}</div>
         ${subs?`<div class="ps-subs"><div class="ps-subs-h">Substitutions</div>${subs}</div>`:''}
+        ${goals?`<div class="ps-subs"><div class="ps-subs-h">Goals</div>${goals}</div>`:''}
+        ${cards?`<div class="ps-subs"><div class="ps-subs-h">Cards</div>${cards}</div>`:''}
       </div>`;
     };
+    const ref=(document.getElementById('referee').value||'').trim();
     document.getElementById('printSheet').innerHTML=`
       <div class="ps-head">
         <img class="ps-logo" src="logos/Logo-scios-bright.png" alt="Science of Sports">
@@ -1297,7 +1400,7 @@ const MS = {
           <span class="ps-an">${esc(this.cur.away?this.cur.away.name:'Away')}</span>
           ${crestImg(this.cur.away?this.cur.away.name:'','crest-lg')}
         </div>
-        <div class="ps-date">${esc(d)}</div>
+        <div class="ps-date">${esc(d)}${ref?`<div class="ps-ref">Referee: ${esc(ref)}</div>`:''}</div>
       </div>
       <div class="ps-body">
         ${teamCol(this.cur.home,'home')}
