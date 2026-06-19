@@ -995,7 +995,8 @@ const MS = {
     };
     document.getElementById(side+'Name').innerHTML=crestImg(t.name,'crest-lg')+esc(t.name);
     // Offer the team's last saved lineup as a template (XI + formation + numbers).
-    this.offerTemplate(side, t);
+    // Skip in coach fill mode — a coach opening a fresh link shouldn't get the prompt.
+    if(!this._fillMode) this.offerTemplate(side, t);
     this.renderSide(side); this.touch();
   },
   // Find this team's most recent saved sheet and offer to reuse its lineup.
@@ -1629,8 +1630,9 @@ const MS = {
   },
   baseUrl(){ return location.origin+location.pathname; },
 
-  // 1) Send an EMPTY formation to a coach. Pick a team → make a #fill= link that
-  // carries just that team's roster (id, number, name) so it opens anywhere.
+  // 1) Send an EMPTY formation to a coach. Pick a team → make a SHORT #t=<id> link.
+  // The coach's tool loads that team's roster from its own built-in data (every coach
+  // opens the same hosted tool, which has all teams), so the link stays ~60 chars.
   shareEmpty(){
     const teams=[...this.data.teams].sort((a,b)=>a.name.localeCompare(b.name));
     if(!teams.length){ alert('No teams available.'); return; }
@@ -1639,8 +1641,7 @@ const MS = {
     if(pick==null) return;
     const t=teams[parseInt(pick,10)-1];
     if(!t){ alert('No team for that number.'); return; }
-    const payload={t:'fill', id:t.id, name:t.name, roster:t.players.map(p=>[p.id,p.num,p.name])};
-    const url=this.baseUrl()+'#fill='+this.encodePayload(payload);
+    const url=this.baseUrl()+'#t='+encodeURIComponent(t.id);
     this.offerShareLink(`Empty sheet for ${t.name}`,
       `Coach — please fill in ${t.name}'s line-up here, then tap “Send back”:\n${url}`, url);
   },
@@ -1699,13 +1700,30 @@ const MS = {
     };
   },
 
-  // On load: if the URL carries a #fill= or #sheet= payload, open it.
+  // On load, open a shared link. Three forms:
+  //   #t=<teamId>   short empty-sheet link — load the team from built-in data (preferred)
+  //   #fill=<b64>   legacy empty-sheet link with the roster encoded (kept for old links)
+  //   #sheet=<b64>  a completed side sent back by a coach
   handleLink(){
     const h=location.hash||'';
+    // Short team-id form
+    const tm=h.match(/^#t=(.+)$/);
+    if(tm){
+      const id=decodeURIComponent(tm[1]);
+      const team=this.data.teams.find(x=>x.id===id);
+      if(!team){ alert('This team isn’t available in the tool yet — ask for an updated link.'); history.replaceState(null,'',this.baseUrl()); return false; }
+      this.fillModeFor(true);
+      this.pickTeam('home', team.id);   // builds a normal empty-XI side from the roster
+      this.cur.away=null;
+      history.replaceState(null,'',this.baseUrl());
+      this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
+      return true;
+    }
+    // Legacy encoded forms
     const m=h.match(/^#(fill|sheet)=(.+)$/);
     if(!m) return false;
     let p; try{ p=this.decodePayload(m[2]); }catch(e){ alert('That link could not be opened.'); return false; }
-    const side=this.fillModeFor(m[1]==='fill');
+    this.fillModeFor(m[1]==='fill');
     this.cur.home=this.sideFromLink(p); this.cur.away=null;
     document.getElementById('homeName').innerHTML=crestImg(this.cur.home.name,'crest-lg')+esc(this.cur.home.name);
     history.replaceState(null,'',this.baseUrl()); // clear the hash so a refresh doesn't re-trigger
