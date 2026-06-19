@@ -1637,13 +1637,29 @@ const MS = {
     const teams=[...this.data.teams].sort((a,b)=>a.name.localeCompare(b.name));
     if(!teams.length){ alert('No teams available.'); return; }
     const list=teams.map((t,i)=>`${i+1}. ${t.name}`).join('\n');
-    const pick=prompt('Send an empty sheet for which team?\n\nType the number:\n\n'+list);
+    const pick=prompt('Send a sheet for which team?\n\nType the number:\n\n'+list);
     if(pick==null) return;
     const t=teams[parseInt(pick,10)-1];
     if(!t){ alert('No team for that number.'); return; }
-    const url=this.baseUrl()+'#t='+encodeURIComponent(t.id);
-    this.offerShareLink(`Empty sheet for ${t.name}`,
-      `Coach — please fill in ${t.name}'s line-up here, then tap “Send back”:\n${url}`, url);
+    // Offer a pre-filled starting point (team's last lineup) for the coach to CORRECT,
+    // or a blank sheet. Pre-fill needs the XI/formation, so it uses the encoded link;
+    // empty uses the short #t= link.
+    const last=this.lastSavedFor(t.name);
+    let url;
+    const prefill = last && last.team.xi && last.team.xi.length
+      && confirm(`Pre-fill ${t.name} with its last line-up for the coach to correct?\n\n`
+        + `OK = send last line-up (${fmtFormation(last.team.formation)}, ${last.team.xi.length} players) to adjust.\n`
+        + `Cancel = send a blank sheet to fill from scratch.`);
+    if(prefill){
+      const lt=last.team;
+      const payload={t:'fill', id:t.id, name:t.name, formation:lt.formation||'4-4-2',
+        roster:t.players.map(p=>[p.id,p.num,p.name]), xi:(lt.xi||[]).map(p=>p.id)};
+      url=this.baseUrl()+'#fill='+this.encodePayload(payload);
+    } else {
+      url=this.baseUrl()+'#t='+encodeURIComponent(t.id);
+    }
+    this.offerShareLink(`Line-up for ${t.name}`,
+      `Coach — please ${prefill?'check/correct':'fill in'} ${t.name}'s line-up here, then tap “Send back”:\n${url}`, url);
   },
 
   // 2) Coach sends the COMPLETED side back as a #sheet= link that loads into your tool.
@@ -1719,16 +1735,43 @@ const MS = {
       this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
       return true;
     }
-    // Legacy encoded forms
+    // Encoded forms: #fill= (empty/pre-filled for a coach) and #sheet= (completed return)
     const m=h.match(/^#(fill|sheet)=(.+)$/);
     if(!m) return false;
     let p; try{ p=this.decodePayload(m[2]); }catch(e){ alert('That link could not be opened.'); return false; }
-    this.fillModeFor(m[1]==='fill');
+    history.replaceState(null,'',this.baseUrl()); // clear the hash so a refresh doesn't re-trigger
+
+    if(m[1]==='sheet'){
+      // A coach's completed line-up — ATTACH it into the current match (don't wipe it).
+      // Restore any in-progress match first, then ask which side to drop it into.
+      this.restoreDraft();
+      const side=this.chooseSideFor(p.name);
+      if(side===null) return false;   // user cancelled — keep whatever was there
+      this.cur[side]=this.sideFromLink(p);
+      document.getElementById(side+'Name').innerHTML=crestImg(p.name||'Team','crest-lg')+esc(p.name||'Team');
+      this.refreshSelects(); this.renderSide('home'); this.renderSide('away');
+      this.showTeam(side); this.updateStrip();
+      alert(`${p.name||'The line-up'} loaded into the ${side==='home'?'Home':'Away'} side.`);
+      return true;
+    }
+
+    // #fill= — coach fill mode (empty or pre-filled), single team
+    this.fillModeFor(true);
     this.cur.home=this.sideFromLink(p); this.cur.away=null;
     document.getElementById('homeName').innerHTML=crestImg(this.cur.home.name,'crest-lg')+esc(this.cur.home.name);
-    history.replaceState(null,'',this.baseUrl()); // clear the hash so a refresh doesn't re-trigger
     this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
     return true;
+  },
+  // Ask whether a returned coach line-up goes in the Home or Away slot. Pre-selects a side
+  // whose team name matches; returns 'home' | 'away' | null (cancel).
+  chooseSideFor(teamName){
+    const h=this.cur.home&&this.cur.home.name, a=this.cur.away&&this.cur.away.name;
+    const match=(x)=> x && teamName && x.toLowerCase()===teamName.toLowerCase();
+    const hint = match(h) ? ' (matches your Home team)' : match(a) ? ' (matches your Away team)' : '';
+    const ans=prompt(`Attach ${teamName||'this line-up'} to which side?${hint}\n\nType  H  for Home  or  A  for Away:`,
+      match(a)?'A':'H');
+    if(ans===null) return null;
+    return /^a/i.test(ans.trim()) ? 'away' : 'home';
   },
   // In fill mode we run a single-team workflow with a "Send back" button, and strip the
   // app chrome (tabs, fixture/competition pickers, match bar, header actions) so the coach
