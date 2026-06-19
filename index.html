@@ -204,6 +204,19 @@
   /* responsive show/hide: Preview is a header button on desktop, a ⋯ menu item on mobile */
   .menu .show-mobile{display:none}
 
+  /* COACH FILL MODE — opened from an empty-sheet link. Strip everything except the
+     coach's own team panel + the "Send back" banner, so the screen is as simple as
+     possible (no tabs, fixture/competition pickers, opponent/score/date, or app actions). */
+  body.fillmode .tabs,
+  body.fillmode #fixtureCard,
+  body.fillmode #leagueCard,
+  body.fillmode .matchcard,
+  body.fillmode .teamtoggle,
+  body.fillmode #awayPanel,
+  body.fillmode header.app button,
+  body.fillmode header.app .menu-wrap,
+  body.fillmode #draftNote{display:none!important}
+
   /* ===== MOBILE ===== */
   @media(max-width:760px){
     main{padding:12px}
@@ -1699,8 +1712,10 @@ const MS = {
     this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
     return true;
   },
-  // In fill mode we run a single-team workflow with a "Send back" button.
-  fillModeFor(isFill){ this._fillMode=isFill; return 'home'; },
+  // In fill mode we run a single-team workflow with a "Send back" button, and strip the
+  // app chrome (tabs, fixture/competition pickers, match bar, header actions) so the coach
+  // sees only his team to fill in. body.fillmode drives the CSS that hides everything else.
+  fillModeFor(isFill){ this._fillMode=isFill; document.body.classList.toggle('fillmode', !!isFill); return 'home'; },
 
   // Export the lineup as JSON matching the SCIOS platform's GET /fixtures/:id/lineup
   // response shape (LineupResponse), so the App's match-analysis formation can ingest it.
