@@ -1630,9 +1630,11 @@ const MS = {
   },
   baseUrl(){ return location.origin+location.pathname; },
 
-  // 1) Send an EMPTY formation to a coach. Pick a team → make a SHORT #t=<id> link.
-  // The coach's tool loads that team's roster from its own built-in data (every coach
-  // opens the same hosted tool, which has all teams), so the link stays ~60 chars.
+  // 1) Send a sheet to a coach. Pick a team → make a SELF-CONTAINED #fill= link that
+  // carries the roster in the URL. This works on ANY device (the coach needn't have the
+  // team in his data) — essential because imported teams have device-local ids. The link
+  // is long, but the share modal keeps it tidy; a short branded link awaits the platform
+  // short-link endpoint (tracked for Cleanthis).
   shareEmpty(){
     const teams=[...this.data.teams].sort((a,b)=>a.name.localeCompare(b.name));
     if(!teams.length){ alert('No teams available.'); return; }
@@ -1641,23 +1643,17 @@ const MS = {
     if(pick==null) return;
     const t=teams[parseInt(pick,10)-1];
     if(!t){ alert('No team for that number.'); return; }
-    // Offer a pre-filled starting point (team's last lineup) for the coach to CORRECT,
-    // or a blank sheet. Pre-fill needs the XI/formation, so it uses the encoded link;
-    // empty uses the short #t= link.
+    // Optionally pre-fill the team's last line-up for the coach to CORRECT, else send blank.
     const last=this.lastSavedFor(t.name);
-    let url;
     const prefill = last && last.team.xi && last.team.xi.length
       && confirm(`Pre-fill ${t.name} with its last line-up for the coach to correct?\n\n`
         + `OK = send last line-up (${fmtFormation(last.team.formation)}, ${last.team.xi.length} players) to adjust.\n`
         + `Cancel = send a blank sheet to fill from scratch.`);
-    if(prefill){
-      const lt=last.team;
-      const payload={t:'fill', id:t.id, name:t.name, formation:lt.formation||'4-4-2',
-        roster:t.players.map(p=>[p.id,p.num,p.name]), xi:(lt.xi||[]).map(p=>p.id)};
-      url=this.baseUrl()+'#fill='+this.encodePayload(payload);
-    } else {
-      url=this.baseUrl()+'#t='+encodeURIComponent(t.id);
-    }
+    const payload={t:'fill', id:t.id, name:t.name,
+      formation: prefill ? (last.team.formation||'4-4-2') : '4-4-2',
+      roster:t.players.map(p=>[p.id,p.num,p.name]),
+      xi: prefill ? (last.team.xi||[]).map(p=>p.id) : []};
+    const url=this.baseUrl()+'#fill='+this.encodePayload(payload);
     this.offerShareLink(`Line-up for ${t.name}`,
       `Coach — please ${prefill?'check/correct':'fill in'} ${t.name}'s line-up here, then tap “Send back”:\n${url}`, url);
   },
