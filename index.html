@@ -45,6 +45,16 @@
     border:none;border-radius:6px;padding:11px 12px;font-size:15px;font-weight:600}
   .menu button:hover{background:var(--surface3)}
 
+  /* share-link modal — keeps the long encoded URL tidy (truncated, with Copy/WhatsApp) */
+  .modal-backdrop{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);
+    align-items:center;justify-content:center;padding:20px}
+  .modal-backdrop.open{display:flex}
+  .modal{background:var(--surface1);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+  .linkbox{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    padding:10px 12px;font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;font-family:ui-monospace,Menlo,Consolas,monospace}
+
   /* collapsed fixture picker (after a fixture is loaded) */
   #fixtureCard.collapsed .segrow,#fixtureCard.collapsed .row,#fixtureCard.collapsed > label{display:none}
   #fixtureCard.collapsed #fixPickStatus{margin:0}
@@ -497,6 +507,19 @@
 <div class="preview-bar no-print">
   <button class="btn-primary" onclick="MS.exportPDF()">🖨 Print / Save PDF</button>
   <button onclick="MS.closePreview()" style="background:#fff;color:#0A1628;font-weight:700">✕ Close preview</button>
+</div>
+<!-- Share-link modal (empty sheet / send-back) — keeps the long URL out of sight -->
+<div id="shareModal" class="modal-backdrop no-print" onclick="if(event.target===this)MS.closeShare()">
+  <div class="modal">
+    <h3 id="shareTitle" style="margin-bottom:6px">Share link</h3>
+    <p class="hint" id="shareMsg" style="margin:0 0 12px"></p>
+    <div class="linkbox"><span id="shareUrlText">—</span></div>
+    <div class="row" style="margin-top:14px;gap:8px">
+      <button class="btn-primary" style="flex:1" onclick="MS.copyShare()">📋 Copy link</button>
+      <button class="btn-ghost" style="flex:1" onclick="MS.shareWhatsApp()">🟢 WhatsApp</button>
+    </div>
+    <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="MS.closeShare()">Close</button>
+  </div>
 </div>
 <!-- Dedicated one-page print sheet (filled on Export PDF / Preview; only visible when printing or previewing) -->
 <div id="printSheet"></div>
@@ -1622,13 +1645,32 @@ const MS = {
       `Here is ${s.name}'s completed line-up — open to load it:\n${url}`, url);
   },
 
-  // Share a link via the native share sheet (mobile) or copy it (desktop).
+  // Share a link. On mobile, use the native share sheet (WhatsApp/email) with a clean
+  // message. On desktop (no native share), open a tidy modal with Copy / WhatsApp so the
+  // long encoded URL is never dumped as raw text.
+  _share:null,
   async offerShareLink(title, text, url){
     if(navigator.share){
       try{ await navigator.share({title, text}); return; }catch(e){ if(e&&e.name==='AbortError') return; }
     }
-    try{ await navigator.clipboard.writeText(text); alert('Link copied — paste it into WhatsApp/email.'); }
-    catch(e){ prompt('Copy this link:', url); }
+    this.openShare(title, text, url);
+  },
+  openShare(title, text, url){
+    this._share={title, text, url};
+    document.getElementById('shareTitle').textContent=title;
+    document.getElementById('shareMsg').textContent=text.replace(url,'').trim();
+    document.getElementById('shareUrlText').textContent=url;
+    document.getElementById('shareModal').classList.add('open');
+  },
+  closeShare(){ document.getElementById('shareModal').classList.remove('open'); },
+  async copyShare(){
+    if(!this._share) return;
+    try{ await navigator.clipboard.writeText(this._share.text); alert('Link copied — paste it into WhatsApp or email.'); }
+    catch(e){ prompt('Copy this link:', this._share.url); }
+  },
+  shareWhatsApp(){
+    if(!this._share) return;
+    window.open('https://wa.me/?text='+encodeURIComponent(this._share.text), '_blank');
   },
 
   // Reconstruct a side object from a link roster ([id,num,name] triples).
@@ -1845,7 +1887,7 @@ const MS = {
     // close the ••• menu when clicking elsewhere
     document.addEventListener('click', e=>{ if(!e.target.closest('.menu-wrap')) this.closeMenu(); });
     // Esc closes the preview overlay
-    document.addEventListener('keydown', e=>{ if(e.key==='Escape') this.closePreview(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ this.closePreview(); this.closeShare(); } });
   }
 };
 function parseCSV(text){
