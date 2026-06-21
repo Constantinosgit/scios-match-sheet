@@ -990,7 +990,7 @@ const MS = {
     this.cur[side]={
       teamId:t.id, name:t.name, league:t.league||'',
       roster:t.players.map(p=>({...p})),
-      xi:[], formation:"4-4-2", subs:[],
+      xi:[], formation:"", subs:[],   // lineup-first: no formation until the user picks one
       coach:t.coach||'', goals:[], cards:[]
     };
     document.getElementById(side+'Name').innerHTML=crestImg(t.name,'crest-lg')+esc(t.name);
@@ -1046,6 +1046,7 @@ const MS = {
         <div class="row">
           <label style="align-self:center">Formation</label>
           <select onchange="MS.setFormation('${side}',this.value)">
+            <option value="" ${!s.formation?'selected':''}>— No formation (list only) —</option>
             ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>${fmtFormation(f)}</option>`).join('')}
           </select>
         </div>
@@ -1055,11 +1056,13 @@ const MS = {
         <input id="coach-${side}" placeholder="Coach name" value="${esc(s.coach||'')}"
           onchange="MS.setCoach('${side}',this.value)" style="flex:1;min-width:140px">
       </div>
+      ${s.formation ? `
       <div class="pitch pitch-${side}" id="pitch-${side}">
         <div class="line halfway"></div><div class="circle"></div>
         <div class="box top"></div><div class="box bot"></div>
       </div>
-      <div class="hint no-print" style="text-align:center;margin-top:4px">Tap a player on the pitch, then another, to swap their positions.</div>
+      <div class="hint no-print" style="text-align:center;margin-top:4px">Tap a player on the pitch, then another, to swap their positions.</div>`
+      : `<div class="hint no-print" style="text-align:center;margin:6px 0;color:var(--cyan)">📋 Lineup-only mode — pick the XI below now; add a formation later when you have it.</div>`}
       <div class="grid2" style="margin-top:12px">
         <div class="listcol">
           <h3>Starting XI <span class="xi-count ${s.xi.length===11?'full':''}">${s.xi.length}/11</span></h3>
@@ -1165,6 +1168,7 @@ const MS = {
   },
   renderPitch(side){
     const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
+    if(!pitch) return;   // lineup-only mode: no pitch rendered
     pitch.querySelectorAll('.spot').forEach(e=>e.remove());
     const f=FORMATIONS[s.formation]||{coords:[],pos:[]};
     const ev=this.playerEvents(s);   // per-player goals / card / sub-off minute
@@ -1507,11 +1511,13 @@ const MS = {
         const [x,y]=f.coords[i]||[50,50];
         return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(shortName(p.name))}</span>${this.spotEvents(ev[p.id])}</div>`;
       }).join('');
-      // XI list: position group (GKP/DEF/MID/ATT) + number + name. Events are shown on
-      // the pitch dots + the Goals/Cards summary, so they're NOT repeated here.
+      const hasForm=!!s.formation;
+      // XI list. With a formation: show the position group (GKP/DEF/MID/ATT). Without one
+      // (lineup-only): just number + name, and show events inline since there's no pitch.
       const xiList=s.xi.map((p,i)=>{
-        const grp=this.positionGroup(f.pos[i]);
-        return `<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-pos">${grp}</span><span class="ps-name">${esc(shortName(p.name))}</span></div>`;
+        const grp=hasForm?`<span class="ps-pos">${this.positionGroup(f.pos[i])}</span>`:'';
+        const evt=hasForm?'':this.eventTags(ev[p.id]);   // no pitch → show events on the row
+        return `<div class="ps-row"><span class="ps-num">${p.num}</span>${grp}<span class="ps-name">${esc(shortName(p.name))}</span>${evt}</div>`;
       }).join('');
       // Bench: everyone not in the XI. Keep event tags here (who came on, cards) — the
       // pitch only shows starters, so this is the only place subs' minutes appear.
@@ -1528,13 +1534,14 @@ const MS = {
         return `<div class="ps-sub"><b>${c.min||'?'}'</b> ${mark} ${R?'(Red)':'(Yellow)'} ${esc(nameOf(c.player))}</div>`;
       }).join('');
       return `<div class="ps-team">
-        <div class="ps-tname">${crestImg(s.name,'crest-lg')}${esc(s.name)} <span class="ps-form">${fmtFormation(s.formation)}</span></div>
+        <div class="ps-tname">${crestImg(s.name,'crest-lg')}${esc(s.name)} <span class="ps-form">${hasForm?fmtFormation(s.formation):'Line-up'}</span></div>
         ${s.coach?`<div class="ps-coach"><b>Coach:</b> ${esc(s.coach)}</div>`:''}
+        ${hasForm?`
         <div class="ps-pitch ps-pitch-${side}">
           <div class="ps-halfway"></div><div class="ps-circle"></div>
           <div class="ps-box ps-box-top"></div><div class="ps-box ps-box-bot"></div>
           ${spots}
-        </div>
+        </div>`:`<div class="ps-subs-h" style="margin-bottom:3px">Starting XI</div>`}
         <div class="ps-xi">${xiList}</div>
         ${benchList?`<div class="ps-subs"><div class="ps-subs-h">Bench</div><div class="ps-xi">${benchList}</div></div>`:''}
         ${goals?`<div class="ps-subs"><div class="ps-subs-h">Goals</div>${goals}</div>`:''}
@@ -1650,7 +1657,7 @@ const MS = {
         + `OK = send last line-up (${fmtFormation(last.team.formation)}, ${last.team.xi.length} players) to adjust.\n`
         + `Cancel = send a blank sheet to fill from scratch.`);
     const payload={t:'fill', id:t.id, name:t.name,
-      formation: prefill ? (last.team.formation||'4-4-2') : '4-4-2',
+      formation: prefill ? (last.team.formation||'') : '',   // blank → coach starts list-only
       roster:t.players.map(p=>[p.id,p.num,p.name]),
       xi: prefill ? (last.team.xi||[]).map(p=>p.id) : []};
     const url=this.baseUrl()+'#fill='+this.encodePayload(payload);
@@ -1706,7 +1713,7 @@ const MS = {
     return {
       teamId:p.id||null, name:p.name||'Team', league:'',
       roster, xi:(p.xi||[]).map(id=>byId.get(id)).filter(Boolean),
-      formation:p.formation||'4-4-2',
+      formation:p.formation||'',   // blank stays list-only until a formation is chosen
       subs:(p.subs||[]).map(([min,off,on])=>({min:min===''?'':(parseInt(min)||''),off,on})),
       coach:p.coach||'', goals:[], cards:[]
     };
