@@ -330,7 +330,7 @@
 
     .ps-xi{font-size:11.5px}
     .ps-row{display:flex;gap:6px;align-items:center;padding:1.5px 0;break-inside:avoid}
-    .ps-row .ps-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ps-row .ps-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
     .ps-num{display:inline-block;width:18px;text-align:center;font-weight:700;color:#1f4ed8;flex:none}
     .ps-pos{display:inline-block;min-width:34px;font-weight:700;font-size:10px;color:#3A5070;flex:none}
     /* per-player event tags on the line-up rows — right-aligned, pill style to match the pitch */
@@ -501,7 +501,16 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device.</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
-      <input id="teamSearch" placeholder="🔍 Search club…" oninput="MS.setTeamFilter(this.value)" style="width:100%;margin-top:10px" />
+      <div class="row" style="margin-top:10px;gap:10px">
+        <div style="flex:1;min-width:160px">
+          <label>Club</label>
+          <select id="clubSelect" onchange="MS.pickClub(this.value)" style="width:100%;margin-top:4px"></select>
+        </div>
+        <div style="flex:1;min-width:160px">
+          <label>Team</label>
+          <select id="teamSelect" onchange="MS.pickRosterTeam(this.value)" style="width:100%;margin-top:4px"></select>
+        </div>
+      </div>
     </div>
     <div id="teamsEditor"></div>
   </section>
@@ -608,8 +617,12 @@ const MS = {
   addTeam(){
     const el=document.getElementById('newTeamName'); const name=el.value.trim();
     if(!name) return;
-    this.data.teams.push({id:crypto.randomUUID(),name,players:[]});
-    el.value=''; this.persist(); this.renderTeams(); this.refreshSelects();
+    const id=crypto.randomUUID();
+    this.data.teams.push({id,name,players:[]});
+    el.value=''; this.persist();
+    // jump the dropdowns to the team just added so it's ready to edit
+    this._club=this.clubOf(name); this._rosterTeamId=id;
+    this.renderTeams(); this.refreshSelects();
   },
   // ---------- CSV import (Cyprus Operation Sheet → Corrected players) ----------
   importCSV(ev){
@@ -866,47 +879,51 @@ const MS = {
   },
   // Club name = team name without the " U14".." U19" age suffix.
   clubOf(name){ return String(name||'').replace(/\s+U\d{2}$/,'').trim() || name; },
-  _openClub:null,            // which club folder is expanded
-  _teamFilter:'',            // search box text
-  setTeamFilter(v){ this._teamFilter=(v||'').toLowerCase(); this.renderTeams(); },
-  toggleClub(club){ this._openClub = (this._openClub===club ? null : club); this.renderTeams(); },
+  _club:'',                  // selected club in the dropdown
+  _rosterTeamId:'',          // selected team id in the dropdown
 
-  renderTeams(){
-    const root=document.getElementById('teamsEditor');
-    // group teams by club
+  // Group teams by club → { clubName: [team, …] }, clubs sorted.
+  clubMap(){
     const clubs={};
     this.data.teams.forEach(t=>{ const c=this.clubOf(t.name); (clubs[c]=clubs[c]||[]).push(t); });
-    let names=Object.keys(clubs).sort((a,b)=>a.localeCompare(b));
-    if(this._teamFilter) names=names.filter(c=>c.toLowerCase().includes(this._teamFilter));
-    if(!names.length){
-      root.innerHTML = this.data.teams.length
-        ? '<div class="empty">No clubs match your search.</div>'
-        : '<div class="empty">No teams yet. Tap <b>🔒 Admin</b> → enter the passcode → <b>Import players (CSV)</b> to load all teams, or <b>Add team</b> manually.</div>';
+    Object.values(clubs).forEach(arr=>arr.sort((a,b)=>a.name.localeCompare(b.name)));
+    return clubs;
+  },
+  pickClub(club){ this._club=club; this._rosterTeamId=''; this.renderTeams(); },
+  pickRosterTeam(id){ this._rosterTeamId=id; this.renderTeams(); },
+
+  renderTeams(){
+    const clubs=this.clubMap();
+    const clubNames=Object.keys(clubs).sort((a,b)=>a.localeCompare(b));
+    const clubSel=document.getElementById('clubSelect');
+    const teamSel=document.getElementById('teamSelect');
+    const root=document.getElementById('teamsEditor');
+
+    if(!clubNames.length){
+      clubSel.innerHTML='<option value="">— no clubs —</option>'; teamSel.innerHTML='';
+      root.innerHTML='<div class="empty">No teams yet. Tap <b>🔒 Admin</b> → <b>Import players (CSV)</b> to load all teams, or use <b>Add team</b> above.</div>';
       return;
     }
-    root.innerHTML = names.map(club=>{
-      const teams=clubs[club].sort((a,b)=>a.name.localeCompare(b.name));
-      const open=this._openClub===club;
-      const ageTeams=teams.length;
-      const players=teams.reduce((n,t)=>n+t.players.length,0);
-      return `<div class="club ${open?'open':''}">
-        <button class="club-head" onclick="MS.toggleClub('${esc(club).replace(/'/g,"\\'")}')">
-          ${crestImg(club,'crest')}
-          <span class="club-name">${esc(club)}</span>
-          <span class="club-meta">${ageTeams} team${ageTeams>1?'s':''} · ${players} players</span>
-          <span class="club-arrow">${open?'▾':'▸'}</span>
-        </button>
-        ${open ? `<div class="club-body">${teams.map(t=>this.teamEditorHTML(t)).join('')}</div>` : ''}
-      </div>`;
-    }).join('');
+    // Club dropdown
+    if(!this._club || !clubs[this._club]) this._club=clubNames[0];
+    clubSel.innerHTML=clubNames.map(c=>`<option value="${esc(c)}" ${c===this._club?'selected':''}>${esc(c)}</option>`).join('');
+
+    // Team dropdown (within the chosen club)
+    const teams=clubs[this._club]||[];
+    if(!this._rosterTeamId || !teams.some(t=>t.id===this._rosterTeamId)) this._rosterTeamId=teams[0]?teams[0].id:'';
+    teamSel.innerHTML=teams.map(t=>`<option value="${t.id}" ${t.id===this._rosterTeamId?'selected':''}>${esc(t.name)} (${t.players.length})</option>`).join('');
+
+    // The selected team's roster editor (with the + Player button)
+    const team=teams.find(t=>t.id===this._rosterTeamId);
+    root.innerHTML = team ? this.teamEditorHTML(team) : '<div class="empty">Select a team.</div>';
   },
   teamEditorHTML(t){
     return `<div class="teamblock">
       <div class="row" style="justify-content:space-between;align-items:center">
         <h4>${esc(t.name)} <span class="xi-count">(${t.players.length})</span></h4>
         <div class="row">
-          <button class="btn-ghost" onclick="MS.addPlayer('${t.id}')">+ Player</button>
-          <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete</button>
+          <button class="btn-primary" onclick="MS.addPlayer('${t.id}')">+ Add player</button>
+          <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete team</button>
         </div>
       </div>
       <div style="margin-top:8px">
@@ -1517,13 +1534,13 @@ const MS = {
       const xiList=s.xi.map((p,i)=>{
         const grp=hasForm?`<span class="ps-pos">${this.positionGroup(f.pos[i])}</span>`:'';
         const evt=hasForm?'':this.eventTags(ev[p.id]);   // no pitch → show events on the row
-        return `<div class="ps-row"><span class="ps-num">${p.num}</span>${grp}<span class="ps-name">${esc(shortName(p.name))}</span>${evt}</div>`;
+        return `<div class="ps-row"><span class="ps-num">${p.num}</span>${grp}<span class="ps-name">${esc(p.name)}</span>${evt}</div>`;
       }).join('');
       // Bench: everyone not in the XI. Keep event tags here (who came on, cards) — the
       // pitch only shows starters, so this is the only place subs' minutes appear.
       const xiIds=new Set(s.xi.map(p=>p.id));
       const benchList=s.roster.filter(p=>!xiIds.has(p.id))
-        .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-name">${esc(shortName(p.name))}</span>${this.eventTags(ev[p.id])}</div>`).join('');
+        .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-name">${esc(p.name)}</span>${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
         const tag=g.kind==='P'?' (Penalty)':g.kind==='OG'?' (Own Goal)':'';
