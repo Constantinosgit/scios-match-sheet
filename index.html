@@ -119,10 +119,13 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:880px){.grid2{grid-template-columns:1fr}}
 
-  /* match header bar */
-  .matchbar{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+  /* match header bar — 3 columns top-aligned so Home/Away dropdowns line up with the
+     DATE label (centring would float the short side columns against the tall middle one) */
+  .matchbar{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start}
+  .matchbar > div{display:flex;flex-direction:column;gap:6px}
   .matchbar .team-name{font-size:20px;font-weight:800;text-align:center}
-  .matchbar .vs{text-align:center;color:var(--muted);font-weight:700}
+  .matchbar .vs{text-align:center;color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .matchbar .datewrap{align-self:center}
   .score{display:flex;gap:8px;align-items:center;justify-content:center}
   .score input{width:54px;text-align:center;font-size:22px;font-weight:800;padding:6px}
 
@@ -238,9 +241,13 @@
 
     /* matchbar stacks: home, score, away each full width (when open) */
     .matchbar{grid-template-columns:1fr;gap:14px}
-    .matchbar .vs{display:none}
+    .matchbar > div{align-items:stretch!important}   /* full-width sections when stacked */
+    .matchbar .vs{display:block;text-align:left}     /* keep the DATE label visible */
+    .matchbar .datewrap{align-self:stretch}
+    .matchbar #matchDate{width:100%!important}        /* date fills the row like the dropdowns */
     .score{justify-content:flex-start}
     .score input{width:64px;font-size:24px}
+    .matchbar #referee{width:100%!important}
 
     /* panel header smaller on mobile (team name already in the strip above) */
     .teampanel h3{font-size:15px}
@@ -444,13 +451,13 @@
           <select id="homeSelect" onchange="MS.pickTeam('home',this.value)" style="width:100%"></select>
           <div class="team-name" id="homeName">—</div>
         </div>
-        <div>
+        <div style="align-items:center">
           <div class="vs">DATE</div>
           <div class="datewrap">
             <!-- visible DD/MM/YYYY display; hidden native date input provides the calendar -->
             <input type="text" id="matchDate" placeholder="DD/MM/YYYY" inputmode="numeric"
                    pattern="\d{2}/\d{2}/\d{4}" readonly onclick="MS.openDate()"
-                   style="width:130px;text-align:center;cursor:pointer" />
+                   style="width:140px;text-align:center;cursor:pointer" />
             <input type="date" id="matchDateNative" onchange="MS.onNativeDate(this.value)" />
           </div>
           <div class="score">
@@ -458,11 +465,9 @@
             <span style="color:var(--muted)">:</span>
             <input class="num" id="awayScore" type="number" min="0" value="0" onchange="MS.touch()" />
           </div>
-          <div class="hint" style="text-align:center;margin-top:2px">Fills in from goals — editable</div>
-          <div style="margin-top:8px;text-align:center">
-            <input id="referee" placeholder="Referee" onchange="MS.touch()"
-              style="width:170px;text-align:center" />
-          </div>
+          <div class="hint" style="text-align:center">Fills in from goals — editable</div>
+          <input id="referee" placeholder="Referee" onchange="MS.touch()"
+            style="width:170px;text-align:center" />
         </div>
         <div>
           <label>Away team</label>
