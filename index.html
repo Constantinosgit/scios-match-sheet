@@ -295,14 +295,18 @@
 
     /* Portrait split into 2 columns: Home (left) | Away (right) */
     .ps-body{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .ps-team{border:1px solid #C8D4EC;border-radius:8px;padding:10px;break-inside:avoid;display:flex;flex-direction:column}
+    /* No break-inside:avoid here — a full team (pitch + 11 + ~30 bench) is taller than an
+       A4 page, so avoiding the break would shove the whole block to page 2 and leave page 1
+       blank. Let it flow; keep the pitch + small rows from splitting instead (below). */
+    .ps-team{border:1px solid #C8D4EC;border-radius:8px;padding:10px;display:flex;flex-direction:column}
     .ps-tname{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:800;margin-bottom:8px}
     .ps-tname .ps-form{margin-left:auto;font-size:12px;font-weight:700;color:#1f4ed8}
     .ps-tname .crest-lg{width:24px;height:24px}
 
     /* Within each team, stacked vertically: pitch (top) → lineup → subs */
     .ps-pitch{position:relative;height:330px;border:1.5px solid rgba(255,255,255,.7);border-radius:6px;
-      background:repeating-linear-gradient(0deg,#3a9a4e 0 12.5%,#359045 12.5% 25%);margin-bottom:8px;overflow:hidden}
+      background:repeating-linear-gradient(0deg,#3a9a4e 0 12.5%,#359045 12.5% 25%);margin-bottom:8px;overflow:hidden;
+      break-inside:avoid}   /* keep the pitch whole; the lists below may flow to the next page */
     /* pitch markings for the printed sheet */
     .ps-halfway{position:absolute;left:0;right:0;top:50%;height:1.5px;background:rgba(255,255,255,.7)}
     .ps-circle{position:absolute;left:50%;top:50%;width:24%;aspect-ratio:1;transform:translate(-50%,-50%);
@@ -315,9 +319,10 @@
       border-radius:50%;background:#8B5CF6;color:#fff;font-weight:800;font-size:11px;border:1.5px solid #fff}
     .ps-pitch-home .ps-dot{background:#8B5CF6}  /* home = purple */
     .ps-pitch-away .ps-dot{background:#EC4899}  /* away = pink */
-    /* show full names — wrap to 2 lines instead of truncating with "…" */
+    /* surname only on the pitch, clipped to one line (full name is in the list below).
+       One line avoids adjacent labels overlapping / doubling in the PDF text layer. */
     .ps-lbl{font-size:8px;line-height:1.05;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;
-      display:block;margin-top:1px;word-break:break-word}
+      display:block;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* event markers on a PDF pitch spot: goal ⚽, card, ↓ sub-off minute */
     .ps-spot .spot-ev{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:1px;line-height:1}
     .ps-spot .spot-ev span{font-size:7.5px;font-weight:800}
@@ -1526,7 +1531,7 @@ const MS = {
       // Pitch dots: number + name + the player's own events (goal ⚽, card, ↓ sub-off minute).
       const spots=s.xi.slice(0,11).map((p,i)=>{
         const [x,y]=f.coords[i]||[50,50];
-        return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(shortName(p.name))}</span>${this.spotEvents(ev[p.id])}</div>`;
+        return `<div class="ps-spot" style="left:${x}%;top:${y}%"><span class="ps-dot">${p.num}</span><span class="ps-lbl">${esc(lastName(p.name))}</span>${this.spotEvents(ev[p.id])}</div>`;
       }).join('');
       const hasForm=!!s.formation;
       // XI list. With a formation: show the position group (GKP/DEF/MID/ATT). Without one
