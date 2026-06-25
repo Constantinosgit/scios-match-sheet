@@ -286,6 +286,17 @@
 
     /* bigger, easier-to-tap delete buttons on touch screens */
     .btn-danger{min-height:40px;padding:8px 12px}
+
+    /* PREVIEW on a phone: the two teams are too wide side-by-side (they overflow off the
+       left edge behind the grey backdrop). Stack them vertically, each full width, and
+       keep the white page inside the viewport. */
+    body.previewing #printSheet{padding:24px 8px 80px}
+    body.previewing #psScale{max-width:100%;width:100%!important}
+    body.previewing #psScale>.ps-body{grid-template-columns:1fr;gap:14px}
+    body.previewing #psScale>.ps-head,
+    body.previewing #psScale>.ps-body,
+    body.previewing #psScale>.ps-foot{max-width:100%}
+    body.previewing .ps-team{break-inside:auto}
   }
 
   /* print */
