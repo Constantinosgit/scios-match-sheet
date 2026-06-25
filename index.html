@@ -140,6 +140,8 @@
     font-weight:700;padding:8px 4px;font-size:15px}
   .player .pname{flex:1;font-size:16px}
   .player .ppos{color:var(--muted);font-size:12px;text-transform:uppercase}
+  /* roster edit row (Teams & Rosters): num + name + position select + delete */
+  .roster-pos{width:84px;flex:none}
   .dropzone{min-height:60px;border:1.5px dashed var(--border);border-radius:8px;padding:8px;transition:border-color .15s,background .15s}
   .dropzone.over{border-color:var(--accent);background:rgba(59,130,246,.08)}
   .xi-count{color:var(--muted);font-size:12px;font-weight:600}
@@ -192,11 +194,12 @@
   .crest-lg{width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:8px}
   .team-name .crest-lg{width:28px;height:28px}
 
-  /* subs */
+  /* subs / goals / cards editor rows */
   .sub-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
   .sub-row select{flex:1;min-width:120px}
-  .sub-row .min{width:64px}
+  .sub-row .min{width:64px;flex:none}
   .sub-row .arrow{color:var(--muted)}
+  .sub-row .ev-kind{flex:0 0 auto;min-width:110px}   /* Normal/Pen/OG, Yellow/Red — sized to content */
 
   .saved-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--border);
     border-radius:8px;margin-bottom:6px;background:var(--surface2)}
@@ -271,6 +274,18 @@
 
     /* fixture/competition pickers: each control full width */
     #fixType,#fixGender,#fixComp,#fixMatch{flex:1 1 100%!important;min-width:0!important}
+
+    /* Teams & Rosters: let the edit row wrap so the name never gets crushed.
+       Row 1 = number + name (fills); row 2 = position select + delete. */
+    .roster-row{flex-wrap:wrap}
+    .roster-row .pname{flex:1 1 auto;min-width:120px}
+    .roster-pos{flex:1 1 60%}
+    .roster-row .btn-danger{flex:0 0 auto;margin-left:auto}
+    /* the goal/card "kind" select joins the others as a full-width line on mobile */
+    .sub-row .ev-kind{flex:1 1 100%;min-width:0}
+
+    /* bigger, easier-to-tap delete buttons on touch screens */
+    .btn-danger{min-height:40px;padding:8px 12px}
   }
 
   /* print */
@@ -958,10 +973,10 @@ const MS = {
       </div>
       <div style="margin-top:8px">
         ${t.players.map(p=>`
-          <div class="player" style="cursor:default">
+          <div class="player roster-row" style="cursor:default">
             <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
-            <input class="pname" style="flex:1" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
-            <select style="width:84px" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
+            <input class="pname" style="flex:1;min-width:0" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
+            <select class="roster-pos" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
             <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
           </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
       </div>
@@ -1315,7 +1330,7 @@ const MS = {
       <input class="min" type="number" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--green)">⚽</span>
       <select onchange="MS.setGoal('${side}',${i},'player',this.value)"><option value="">scorer…</option>${this.playerOptions(side,g.player)}</select>
-      <select style="width:auto" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
+      <select class="ev-kind" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
         <option value="" ${!g.kind?'selected':''}>Normal</option>
         <option value="P" ${g.kind==='P'?'selected':''}>Penalty</option>
         <option value="OG" ${g.kind==='OG'?'selected':''}>Own Goal</option>
@@ -1351,7 +1366,7 @@ const MS = {
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${c.min??''}" onchange="MS.setCard('${side}',${i},'min',this.value)">
       <select onchange="MS.setCard('${side}',${i},'player',this.value)"><option value="">player…</option>${this.playerOptions(side,c.player)}</select>
-      <select class="min" style="width:auto" onchange="MS.setCard('${side}',${i},'type',this.value)">
+      <select class="ev-kind" onchange="MS.setCard('${side}',${i},'type',this.value)">
         <option value="Y" ${c.type!=='R'?'selected':''}>🟨 Yellow</option>
         <option value="R" ${c.type==='R'?'selected':''}>🟥 Red</option>
       </select>
