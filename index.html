@@ -370,13 +370,30 @@
     display:block;position:fixed;inset:0;z-index:9999;overflow:auto;
     background:#5b6472;padding:24px 12px 80px;
   }
+  /* In preview, ignore the print-fit scaling — the screen sheet should be readable and
+     scrollable, not squeezed to one page. */
+  body.previewing #psScale{transform:none!important;height:auto!important;width:auto!important;
+    max-width:920px;margin:0 auto}
   /* frame the sheet as a white A4-ish page centered in the overlay */
-  body.previewing #printSheet>.ps-head,
-  body.previewing #printSheet>.ps-body,
-  body.previewing #printSheet>.ps-foot{max-width:900px;margin-left:auto;margin-right:auto;background:#fff}
-  body.previewing #printSheet>.ps-head{padding:14px 18px 6px;border-radius:8px 8px 0 0}
-  body.previewing #printSheet>.ps-body{padding:0 18px 14px}
-  body.previewing #printSheet>.ps-foot{padding:0 18px 18px;border-radius:0 0 8px 8px}
+  body.previewing #psScale>.ps-head,
+  body.previewing #psScale>.ps-body,
+  body.previewing #psScale>.ps-foot{max-width:900px;margin-left:auto;margin-right:auto;background:#fff}
+  body.previewing #psScale>.ps-head{padding:14px 18px 6px;border-radius:8px 8px 0 0}
+  body.previewing #psScale>.ps-body{padding:0 18px 14px}
+  body.previewing #psScale>.ps-foot{padding:0 18px 18px;border-radius:0 0 8px 8px}
+  /* MORE READABLE ON SCREEN — bump sizes and darken the low-contrast greys/blues.
+     These apply only in preview; the actual PDF keeps its compact print sizing. */
+  body.previewing .ps-xi{font-size:15px}
+  body.previewing .ps-row{padding:3px 0}
+  body.previewing .ps-name{color:#0A1628}                 /* near-black names (was grey-ish) */
+  body.previewing .ps-num{color:#1d4ed8;font-size:15px}   /* stronger blue numbers */
+  body.previewing .ps-pos{font-size:12px;color:#1f2d44}
+  body.previewing .ps-tname{font-size:19px}
+  body.previewing .ps-coach,body.previewing .ps-subs-h{font-size:13px;color:#1f2d44}
+  body.previewing .ps-sub{font-size:13px}
+  body.previewing .ps-score .ps-hn,body.previewing .ps-score .ps-an{font-size:20px}
+  body.previewing .ps-score .ps-sc{font-size:26px}
+  body.previewing .ps-date{font-size:15px;color:#1f2d44}
   /* preview action bar (Print / Close) pinned to the top of the overlay */
   .preview-bar{display:none}
   body.previewing .preview-bar{display:flex;gap:10px;justify-content:center;align-items:center;
@@ -1549,10 +1566,11 @@ const MS = {
         const evt=hasForm?'':this.eventTags(ev[p.id]);   // no pitch → show events on the row
         return `<div class="ps-row"><span class="ps-num">${p.num}</span>${grp}<span class="ps-name">${esc(p.name)}</span>${evt}</div>`;
       }).join('');
-      // Bench: everyone not in the XI. Keep event tags here (who came on, cards) — the
-      // pitch only shows starters, so this is the only place subs' minutes appear.
+      // Substitutes: only players who actually CAME ON (have an on-minute) — not the whole
+      // squad. Keeps the sheet to the matchday players and saves space (Marios). Event tags
+      // show their on-minute, cards etc. (the pitch only shows starters).
       const xiIds=new Set(s.xi.map(p=>p.id));
-      const benchList=s.roster.filter(p=>!xiIds.has(p.id))
+      const benchList=s.roster.filter(p=>!xiIds.has(p.id) && ev[p.id] && ev[p.id].on!=null)
         .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-name">${esc(p.name)}</span>${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
@@ -1573,7 +1591,7 @@ const MS = {
           ${spots}
         </div>`:`<div class="ps-subs-h" style="margin-bottom:3px">Starting XI</div>`}
         <div class="ps-xi">${xiList}</div>
-        ${benchList?`<div class="ps-subs"><div class="ps-subs-h">Bench</div><div class="ps-xi">${benchList}</div></div>`:''}
+        ${benchList?`<div class="ps-subs"><div class="ps-subs-h">Substitutes used</div><div class="ps-xi">${benchList}</div></div>`:''}
         ${goals?`<div class="ps-subs"><div class="ps-subs-h">Goals</div>${goals}</div>`:''}
         ${cards?`<div class="ps-subs"><div class="ps-subs-h">Cards</div>${cards}</div>`:''}
       </div>`;
