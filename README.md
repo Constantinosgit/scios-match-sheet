@@ -16,7 +16,7 @@ The browser remembers both settings for next time. (The tool shows a one-time re
 ## Using it
 
 1. **Teams & Rosters tab** (admin only — see below):
-   - **Import players (CSV)** — export the Cyprus Operation Sheet "Corrected players" tab to CSV, import it. Groups players by `TeamName`, uses the `Correct name` where present.
+   - **Import players (CSV)** — export the Cyprus Operation Sheet "Corrected players" tab to CSV, import it. Groups players by `TeamName`, uses the `Correct name` where present. You can **select several CSVs at once** (one per spreadsheet tab) — they're parsed and merged, with a single Replace/Merge choice applied to the whole batch.
    - **Import fixtures (CSV)** — export the "Fixture Import" tab to CSV, import it (1,080 fixtures).
 2. **Match Sheet tab**:
    - **Load a fixture**: Type (🏟️ Club / 🌍 National) → Men/Women → age group → round → match. Auto-fills both teams + date.

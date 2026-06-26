@@ -36,6 +36,8 @@
   .datewrap{position:relative;display:inline-block}
   .datewrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;
     border:none;padding:0;margin:0;cursor:pointer;min-height:0}
+  .date-cal{position:absolute;right:9px;top:50%;transform:translateY(-50%);
+    pointer-events:none;font-size:15px;opacity:.8}
   /* ••• overflow menu in the header */
   .menu-wrap{position:relative}
   .menu{position:absolute;right:0;top:46px;background:var(--surface2);border:1px solid var(--border);
@@ -499,13 +501,15 @@
         </div>
         <div style="align-items:center">
           <div class="vs">DATE</div>
-          <div class="datewrap">
+          <div class="datewrap" onclick="MS.openDate()" style="cursor:pointer">
             <!-- visible DD/MM/YYYY display; hidden native date input provides the calendar -->
             <input type="text" id="matchDate" placeholder="DD/MM/YYYY" inputmode="numeric"
-                   pattern="\d{2}/\d{2}/\d{4}" readonly onclick="MS.openDate()"
-                   style="width:140px;text-align:center;cursor:pointer" />
+                   pattern="\d{2}/\d{2}/\d{4}" readonly
+                   style="width:140px;text-align:center;cursor:pointer;padding-right:30px" />
+            <span class="date-cal" aria-hidden="true">📅</span>
             <input type="date" id="matchDateNative" onchange="MS.onNativeDate(this.value)" />
           </div>
+          <div class="hint" style="text-align:center">Tap to change (e.g. postponed match)</div>
           <div class="score">
             <input class="num" id="homeScore" type="number" min="0" value="0" onchange="MS.touch()" />
             <span style="color:var(--muted)">:</span>
@@ -547,8 +551,8 @@
       </div>
       <!-- Admin-only data controls: importing players/fixtures and clearing data -->
       <div id="adminTools" class="row" style="margin-top:10px;display:none">
-        <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="MS.importCSV(event)">
-        <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">⬆ Import players (CSV)</button>
+        <input type="file" id="csvFile" accept=".csv" multiple style="display:none" onchange="MS.importCSV(event)">
+        <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">⬆ Import players (CSV — select one or many tabs)</button>
         <input type="file" id="fixFile" accept=".csv" style="display:none" onchange="MS.importFixtures(event)">
         <button class="btn-ghost" onclick="document.getElementById('fixFile').click()">⬆ Import fixtures (CSV)</button>
         <button class="btn-danger" onclick="MS.clearAllTeams()">Clear all</button>
@@ -681,33 +685,31 @@ const MS = {
     this.renderTeams(); this.refreshSelects();
   },
   // ---------- CSV import (Cyprus Operation Sheet → Corrected players) ----------
+  // Import one OR MANY CSVs at once (one per spreadsheet tab). All files are read,
+  // then a single Replace/Merge choice is applied across the whole batch.
   importCSV(ev){
     if(!this.requireAdmin()){ ev.target.value=''; return; }
-    const file=ev.target.files[0]; if(!file) return;
-    const reader=new FileReader();
-    reader.onload=e=>{
-      try{ this._ingestCSV(e.target.result); }
-      catch(err){ document.getElementById('importStatus').textContent='Import failed: '+err.message;
-                  document.getElementById('importStatus').style.color='var(--red)'; }
-      ev.target.value=''; // allow re-importing same file
-    };
-    reader.readAsText(file);
+    const files=[...(ev.target.files||[])]; if(!files.length) return;
+    Promise.all(files.map(f=>f.text().then(text=>({name:f.name,text}))))
+      .then(parts=>{
+        try{ this._ingestMany(parts); }
+        catch(err){ const s=document.getElementById('importStatus'); s.textContent='Import failed: '+err.message; s.style.color='var(--red)'; }
+      })
+      .finally(()=>{ ev.target.value=''; }); // allow re-importing the same files
   },
-  _ingestCSV(text){
+  // Parse one CSV's text → {byTeam:Map(name→players[]), teamLeague:Map, count, corrected}.
+  _parseCSV(text){
     const rows=parseCSV(text);
     if(!rows.length) throw new Error('empty file');
-    // locate the header row (may not be the first line — sheet has banner rows)
     let hi=rows.findIndex(r=>r.map(c=>c.toLowerCase().trim()).includes('teamname'));
     if(hi<0) hi=rows.findIndex(r=>r.some(c=>/^name$/i.test(c.trim())));
-    if(hi<0) throw new Error('could not find a header row with Name / TeamName');
+    if(hi<0) throw new Error('no header row with Name / TeamName');
     const head=rows[hi].map(c=>c.trim().toLowerCase());
     const col=(...names)=>{ for(const n of names){const i=head.indexOf(n); if(i>=0)return i;} return -1; };
     const iName=col('name'), iTeam=col('teamname','team name','team'),
           iLeague=col('leaguename','league name','league','competition'),
           iCorr=col('correct name','correct name (sos input)','correctname'), iId=col('id');
     if(iName<0||iTeam<0) throw new Error('missing Name or TeamName column');
-
-    // group players by team, corrected name wins; remember each team's league
     const byTeam=new Map(); const teamLeague=new Map(); let count=0, corrected=0;
     for(let r=hi+1;r<rows.length;r++){
       const row=rows[r]; if(!row) continue;
@@ -724,33 +726,48 @@ const MS = {
       count++;
     }
     if(!count) throw new Error('no player rows found under the header');
+    return {byTeam, teamLeague, count, corrected};
+  },
+  // Ingest a batch of parsed CSVs (one per tab). Merges all tabs together first, then
+  // applies ONE Replace/Merge choice for the whole batch (so files don't overwrite each
+  // other). `parts` = [{name, text}, …].
+  _ingestMany(parts){
+    // Parse all; collect per-file errors but keep going so one bad tab doesn't block the rest.
+    const all=new Map(), allLeague=new Map(); let total=0, corrected=0; const errors=[];
+    parts.forEach(p=>{
+      try{
+        const {byTeam, teamLeague, count, corrected:corr}=this._parseCSV(p.text);
+        total+=count; corrected+=corr;
+        for(const [team,players] of byTeam){
+          if(!all.has(team)){ all.set(team,[]); allLeague.set(team, teamLeague.get(team)||''); }
+          // re-number within the combined team and append
+          const arr=all.get(team);
+          players.forEach(pl=>{ pl.num=arr.length+1; arr.push(pl); });
+        }
+      }catch(err){ errors.push(`${p.name}: ${err.message}`); }
+    });
+    if(!all.size) throw new Error(errors.join(' · ')||'nothing to import');
 
-    // Default to a clean slate: replace ALL existing teams with the CSV contents
-    // (removes the sample/seed teams). Cancel = merge instead.
+    const tabsNote = parts.length>1 ? ` from ${parts.length} files/tabs` : '';
     const replaceAll = this.data.teams.length===0 ? true
-      : confirm(`Import found ${byTeam.size} teams / ${count} players.\n\n`
+      : confirm(`Import found ${all.size} teams / ${total} players${tabsNote}.\n\n`
         + `OK  = REPLACE all current teams with this list (clears the ${this.data.teams.length} existing teams — recommended for a clean load).\n`
         + `Cancel = MERGE (add/update teams, keep the rest).`);
 
     let teamsAdded=0, teamsUpdated=0;
-    if(replaceAll){
-      this.data.teams=[];
-      for(const [teamName,players] of byTeam){
-        this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:teamLeague.get(teamName)||'', players}); teamsAdded++;
-      }
-    } else {
-      for(const [teamName,players] of byTeam){
-        const existing=this.data.teams.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
-        if(existing){ existing.players=players; existing.league=teamLeague.get(teamName)||existing.league||''; teamsUpdated++; }
-        else { this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:teamLeague.get(teamName)||'', players}); teamsAdded++; }
-      }
+    if(replaceAll) this.data.teams=[];
+    for(const [teamName,players] of all){
+      const existing=replaceAll?null:this.data.teams.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
+      if(existing){ existing.players=players; existing.league=allLeague.get(teamName)||existing.league||''; teamsUpdated++; }
+      else { this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:allLeague.get(teamName)||'', players}); teamsAdded++; }
     }
     this.persist(); this.renderTeams(); this.refreshSelects();
     const s=document.getElementById('importStatus');
-    s.style.color='var(--green)';
+    s.style.color = errors.length ? 'var(--amber)' : 'var(--green)';
     s.textContent=(replaceAll?`Replaced all teams. `:``)
-      +`Imported ${count} players across ${byTeam.size} teams `
-      +`(${teamsAdded} new, ${teamsUpdated} updated; ${corrected} used a corrected name).`;
+      +`Imported ${total} players across ${all.size} teams${tabsNote} `
+      +`(${teamsAdded} new, ${teamsUpdated} updated; ${corrected} corrected names).`
+      +(errors.length?` Skipped: ${errors.join(' · ')}`:``);
   },
 
   // ---------- fixtures import ----------
@@ -989,12 +1006,13 @@ const MS = {
           <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete team</button>
         </div>
       </div>
+      <p class="hint" style="margin:4px 0 8px">Each row: <b>shirt number</b> · <b>name</b> · <b>usual position</b> (optional). The usual position just auto-places the player in the right spot when you tap him onto the pitch — the match positions on the sheet come from the formation.</p>
       <div style="margin-top:8px">
         ${t.players.map(p=>`
           <div class="player roster-row" style="cursor:default">
             <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
             <input class="pname" style="flex:1;min-width:0" placeholder="Player name" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
-            <select class="roster-pos" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
+            <select class="roster-pos" title="Usual position (optional) — auto-places him on the pitch" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
             <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
           </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
       </div>
