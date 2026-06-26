@@ -920,8 +920,15 @@ const MS = {
   },
   addPlayer(teamId){
     const t=this.data.teams.find(x=>x.id===teamId);
-    t.players.push({id:crypto.randomUUID(),num:t.players.length+1,name:'New player',pos:''});
+    // Add at the TOP and empty-named so it's obvious it worked (was appended at the bottom,
+    // off-screen, which made it look like nothing happened). Focus its name to type at once.
+    const np={id:crypto.randomUUID(),num:(t.players.length?Math.max(...t.players.map(p=>+p.num||0))+1:1),name:'',pos:''};
+    t.players.unshift(np);
     this.persist(); this.renderTeams();
+    // focus the new player's name field (first roster row) and scroll it into view
+    const root=document.getElementById('teamsEditor');
+    const firstName=root&&root.querySelector('.roster-row .pname');
+    if(firstName){ firstName.scrollIntoView({block:'center',behavior:'smooth'}); firstName.focus(); }
   },
   delPlayer(teamId,pid){
     const t=this.data.teams.find(x=>x.id===teamId);
@@ -986,7 +993,7 @@ const MS = {
         ${t.players.map(p=>`
           <div class="player roster-row" style="cursor:default">
             <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
-            <input class="pname" style="flex:1;min-width:0" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
+            <input class="pname" style="flex:1;min-width:0" placeholder="Player name" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
             <select class="roster-pos" title="Default position" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
             <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
           </div>`).join('') || '<div class="empty">No players yet — add some.</div>'}
