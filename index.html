@@ -204,11 +204,11 @@
   .sub-row .ev-kind{flex:0 0 auto;min-width:110px}   /* Normal/Pen/OG, Yellow/Red — sized to content */
 
   .saved-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--border);
-    border-radius:8px;margin-bottom:6px;background:var(--surface2)}
-  .saved-item .meta{flex:1}.saved-item .meta b{display:block}
-  .saved-item .meta small{color:var(--muted)}
-  .empty{color:var(--muted);font-size:13px;padding:8px 0}
-  .hint{color:var(--muted);font-size:12px;margin-top:4px}
+    border-radius:8px;margin-bottom:6px;background:var(--surface2);flex-wrap:wrap}
+  .saved-item .meta{flex:1 1 60%;min-width:0}.saved-item .meta b{display:block}
+  .saved-item .meta small{color:var(--text2)}
+  .empty{color:var(--text2);font-size:13px;padding:8px 0}
+  .hint{color:var(--text2);font-size:12px;margin-top:4px}
   /* responsive show/hide: Preview is a header button on desktop, a ⋯ menu item on mobile */
   .menu .show-mobile{display:none}
 
@@ -288,6 +288,11 @@
 
     /* bigger, easier-to-tap delete buttons on touch screens */
     .btn-danger{min-height:40px;padding:8px 12px}
+
+    /* Saved Sheets: on a phone, the meta takes the top line and the Open/Delete buttons
+       sit on a tidy second line instead of crushing the text. */
+    .saved-item .meta{flex:1 1 100%}
+    .saved-item .btn-ghost,.saved-item .btn-danger{flex:1 1 0}
 
     /* PREVIEW on a phone: the two teams are too wide side-by-side (they overflow off the
        left edge behind the grey backdrop). Stack them vertically, each full width, and
@@ -552,13 +557,13 @@
       <!-- Admin-only data controls: importing players/fixtures and clearing data -->
       <div id="adminTools" class="row" style="margin-top:10px;display:none">
         <input type="file" id="csvFile" accept=".csv" multiple style="display:none" onchange="MS.importCSV(event)">
-        <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">⬆ Import players (CSV — select one or many tabs)</button>
+        <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">⬆ Import players (CSV)</button>
         <input type="file" id="fixFile" accept=".csv" style="display:none" onchange="MS.importFixtures(event)">
         <button class="btn-ghost" onclick="document.getElementById('fixFile').click()">⬆ Import fixtures (CSV)</button>
         <button class="btn-danger" onclick="MS.clearAllTeams()">Clear all</button>
       </div>
       <p class="hint" id="adminHint">Importing players &amp; fixtures and clearing data are <b>admin-only</b> — tap <b>🔒 Admin</b> to unlock. Anyone can build and export match sheets.</p>
-      <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device.</p>
+      <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go.</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
