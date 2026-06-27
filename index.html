@@ -209,6 +209,8 @@
   .saved-item .meta small{color:var(--text2)}
   .empty{color:var(--text2);font-size:13px;padding:8px 0}
   .hint{color:var(--text2);font-size:12px;margin-top:4px}
+  .warn{background:rgba(245,158,11,.12);border:1px solid var(--amber);color:var(--amber);
+    border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;margin:6px 0}
   /* responsive show/hide: Preview is a header button on desktop, a ⋯ menu item on mobile */
   .menu .show-mobile{display:none}
 
@@ -674,8 +676,25 @@ const MS = {
       document.getElementById('tab-'+t).style.display = (t===name)?'':'none';
       document.querySelector('.tab[data-tab="'+t+'"]').classList.toggle('active', t===name);
     });
+    if(name==='build'){ this.syncRosters(); this.renderSide('home'); this.renderSide('away'); }
     if(name==='teams') this.renderTeams();
     if(name==='saved') this.renderSaved();
+  },
+  // Pull any players added/removed in Teams & Rosters into the OPEN sheet, without losing
+  // the current XI or per-sheet number edits. Fixes: a player added mid-build didn't show
+  // up in the Squad until you re-picked the team / started a New sheet.
+  syncRosters(){
+    ['home','away'].forEach(side=>{
+      const s=this.cur[side]; if(!s||!s.teamId) return;
+      const team=this.data.teams.find(t=>t.id===s.teamId); if(!team) return;
+      const have=new Set(s.roster.map(p=>p.id));
+      // add players that exist on the master team but not yet in this sheet's roster
+      team.players.forEach(p=>{ if(!have.has(p.id)) s.roster.push({...p}); });
+      // drop players removed from the master team (also pull them out of the XI)
+      const masterIds=new Set(team.players.map(p=>p.id));
+      s.roster=s.roster.filter(p=>masterIds.has(p.id));
+      s.xi=s.xi.filter(p=>masterIds.has(p.id));
+    });
   },
 
   // ---------- team/roster editor ----------
@@ -1002,6 +1021,16 @@ const MS = {
     const team=teams.find(t=>t.id===this._rosterTeamId);
     root.innerHTML = team ? this.teamEditorHTML(team) : '<div class="empty">Select a team.</div>';
   },
+  // Return the list of shirt numbers used by more than one player (ignores blank/0).
+  dupNumbers(players){
+    const seen={}, dups=new Set();
+    (players||[]).forEach(p=>{ const n=parseInt(p.num); if(!n) return; if(seen[n]) dups.add(n); seen[n]=1; });
+    return [...dups].sort((a,b)=>a-b);
+  },
+  dupWarning(players){
+    const d=this.dupNumbers(players);
+    return d.length ? `<div class="warn no-print">⚠ Duplicate shirt number${d.length>1?'s':''}: ${d.join(', ')} — two players share the same number.</div>` : '';
+  },
   teamEditorHTML(t){
     return `<div class="teamblock">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -1011,6 +1040,7 @@ const MS = {
           <button class="btn-danger" onclick="MS.delTeam('${t.id}')">Delete team</button>
         </div>
       </div>
+      ${this.dupWarning(t.players)}
       <p class="hint" style="margin:4px 0 8px">Each row: <b>shirt number</b> · <b>name</b> · <b>usual position</b> (optional). The usual position just auto-places the player in the right spot when you tap him onto the pitch — the match positions on the sheet come from the formation.</p>
       <div style="margin-top:8px">
         ${t.players.map(p=>`
@@ -1166,6 +1196,7 @@ const MS = {
       </div>
       <div class="hint no-print" style="text-align:center;margin-top:4px">Tap a player on the pitch, then another, to swap their positions.</div>`
       : `<div class="hint no-print" style="text-align:center;margin:6px 0;color:var(--cyan)">📋 Lineup-only mode — pick the XI below now; add a formation later when you have it.</div>`}
+      ${this.dupWarning(s.xi)}
       <div class="grid2" style="margin-top:12px">
         <div class="listcol">
           <h3>Starting XI <span class="xi-count ${s.xi.length===11?'full':''}">${s.xi.length}/11</span></h3>
