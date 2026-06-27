@@ -211,6 +211,8 @@
   .hint{color:var(--text2);font-size:12px;margin-top:4px}
   .warn{background:rgba(245,158,11,.12);border:1px solid var(--amber);color:var(--amber);
     border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;margin:6px 0}
+  /* light theme: darken so the warning text clears AA contrast on the pale fill */
+  :root[data-theme="light"] .warn{background:rgba(217,119,6,.10);border-color:#D97706;color:#9A4E00}
   /* responsive show/hide: Preview is a header button on desktop, a ⋯ menu item on mobile */
   .menu .show-mobile{display:none}
 
@@ -687,6 +689,7 @@ const MS = {
     ['home','away'].forEach(side=>{
       const s=this.cur[side]; if(!s||!s.teamId) return;
       const team=this.data.teams.find(t=>t.id===s.teamId); if(!team) return;
+      if(!Array.isArray(s.roster)) s.roster=[]; if(!Array.isArray(s.xi)) s.xi=[];
       const have=new Set(s.roster.map(p=>p.id));
       // add players that exist on the master team but not yet in this sheet's roster
       team.players.forEach(p=>{ if(!have.has(p.id)) s.roster.push({...p}); });
@@ -1029,7 +1032,7 @@ const MS = {
   },
   dupWarning(players){
     const d=this.dupNumbers(players);
-    return d.length ? `<div class="warn no-print">⚠ Duplicate shirt number${d.length>1?'s':''}: ${d.join(', ')} — two players share the same number.</div>` : '';
+    return d.length ? `<div class="warn no-print">⚠ Duplicate shirt number${d.length>1?'s':''}: ${d.join(', ')} — more than one player shares the same number.</div>` : '';
   },
   teamEditorHTML(t){
     return `<div class="teamblock">
