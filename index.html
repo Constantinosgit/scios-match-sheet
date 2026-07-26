@@ -581,7 +581,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26c</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26d</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -677,10 +677,15 @@ const MS = {
     if(!this.data.teams) this.data.teams=[];
     if(!this.data.sheets) this.data.sheets=[];
     // Pre-load bundled default data (teams + fixtures) so the tool works for
-    // everyone with no import. Only used on first visit (when nothing is saved yet).
-    if(this.data.teams.length===0 && window.SCIOS_DATA && window.SCIOS_DATA.teams){
+    // everyone with no import — but ONLY on a genuine first visit. An empty team
+    // list is not enough to detect that: "Clear all" also leaves it empty, and the
+    // next reload used to re-seed the bundled roster, so cleared teams kept coming
+    // back (with the bundle's import-order shirt numbers). `seeded` records that
+    // the bundle has already been applied once on this device.
+    if(this.data.teams.length===0 && !this.data.seeded && window.SCIOS_DATA && window.SCIOS_DATA.teams){
       this.data.teams = window.SCIOS_DATA.teams;
       this.data.fixtures = window.SCIOS_DATA.fixtures || [];
+      this.data.seeded = true;
       this.persist();
     }
   },
@@ -833,6 +838,9 @@ const MS = {
 
     let teamsAdded=0, teamsUpdated=0;
     if(replaceAll) this.data.teams=[];
+    // An import is authoritative from here on — never re-seed the bundled data.js
+    // over it on a later reload.
+    this.data.seeded=true;
     for(const [teamName,players] of all){
       const existing=replaceAll?null:this.data.teams.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
       if(existing){ existing.players=players; existing.league=allLeague.get(teamName)||existing.league||''; teamsUpdated++; }
@@ -1002,7 +1010,10 @@ const MS = {
     if(!this.requireAdmin()) return;
     if(!this.data.teams.length){ alert('No teams to clear.'); return; }
     if(!confirm(`Delete ALL ${this.data.teams.length} teams and their rosters? This cannot be undone.`)) return;
-    this.data.teams=[]; this.persist(); this.renderTeams(); this.refreshSelects();
+    // Mark the bundle as spent, or the next reload re-seeds data.js and the teams
+    // just deleted reappear.
+    this.data.teams=[]; this.data.seeded=true;
+    this.persist(); this.renderTeams(); this.refreshSelects();
     const s=document.getElementById('importStatus');
     if(s){ s.style.color='var(--text2)'; s.textContent='All teams cleared. Import a CSV to load fresh.'; }
   },
