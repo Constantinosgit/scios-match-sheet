@@ -142,6 +142,13 @@
     font-weight:700;padding:8px 4px;font-size:15px}
   .player .pname{flex:1;font-size:16px}
   .player .ppos{color:var(--muted);font-size:12px;text-transform:uppercase}
+  /* Marks a player with no platform_player_id. He can still be picked — the badge
+     is a reconciliation to-do, not a block. Never printed on the match sheet. */
+  .unlinked{margin-left:6px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--amber);
+    background:color-mix(in srgb,var(--amber) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--amber) 38%,transparent);vertical-align:middle}
+  @media print{.unlinked{display:none}}
   /* roster edit row (Teams & Rosters): num + name + position select + delete */
   .roster-pos{width:84px;flex:none}
   .dropzone{min-height:60px;border:1.5px dashed var(--border);border-radius:8px;padding:8px;transition:border-color .15s,background .15s}
@@ -735,7 +742,12 @@ const MS = {
     const col=(...names)=>{ for(const n of names){const i=head.indexOf(n); if(i>=0)return i;} return -1; };
     const iName=col('name'), iTeam=col('teamname','team name','team'),
           iLeague=col('leaguename','league name','league','competition'),
-          iCorr=col('correct name','correct name (sos input)','correctname'), iId=col('id');
+          iCorr=col('correct name','correct name (sos input)','correctname'), iId=col('id'),
+          // The platform's stable player UUID. `Id` above is the SciSports id, which is
+          // only unique per account+season — the same number is a different person in a
+          // different season, so it must never be the join key. Optional: rosters
+          // exported before the platform had this column simply import unlinked.
+          iPid=col('platform_player_id','platform player id','platformplayerid','player_uuid');
     if(iName<0||iTeam<0) throw new Error('missing Name or TeamName column');
     const byTeam=new Map(); const teamLeague=new Map(); let count=0, corrected=0;
     for(let r=hi+1;r<rows.length;r++){
@@ -749,7 +761,8 @@ const MS = {
       if(corr) corrected++;
       if(!byTeam.has(team)){ byTeam.set(team,[]); teamLeague.set(team, league); }
       byTeam.get(team).push({id:crypto.randomUUID(), num:byTeam.get(team).length+1, name, pos:'',
-                             srcId:iId>=0?(row[iId]||'').trim():''});
+                             srcId:iId>=0?(row[iId]||'').trim():'',
+                             platformId:iPid>=0?(row[iPid]||'').trim():''});
       count++;
     }
     if(!count) throw new Error('no player rows found under the header');
@@ -1034,6 +1047,17 @@ const MS = {
     const d=this.dupNumbers(players);
     return d.length ? `<div class="warn no-print">⚠ Duplicate shirt number${d.length>1?'s':''}: ${d.join(', ')} — more than one player shares the same number.</div>` : '';
   },
+  // How much of this squad resolves to a platform player. Purely informational: an
+  // unlinked player can still be picked and exported, he is just matched by name on
+  // import instead of by id. Hidden once the whole squad is linked.
+  linkStatus(side){
+    const r=this.cur[side]?.roster||[];
+    if(!r.length) return '';
+    const n=r.filter(p=>!p.platformId).length;
+    if(!n) return '';
+    const who = n===r.length ? 'No players in this squad are' : `${n} of ${r.length} players are not`;
+    return `<div class="hint no-print" style="margin:6px 0">🔗 ${who} linked to a platform profile — the sheet works either way; unlinked players are matched by name when the platform imports it.</div>`;
+  },
   teamEditorHTML(t){
     return `<div class="teamblock">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -1200,6 +1224,7 @@ const MS = {
       <div class="hint no-print" style="text-align:center;margin-top:4px">Tap a player on the pitch, then another, to swap their positions.</div>`
       : `<div class="hint no-print" style="text-align:center;margin:6px 0;color:var(--cyan)">📋 Lineup-only mode — pick the XI below now; add a formation later when you have it.</div>`}
       ${this.dupWarning(s.xi)}
+      ${this.linkStatus(side)}
       <div class="grid2" style="margin-top:12px">
         <div class="listcol">
           <h3>Starting XI <span class="xi-count ${s.xi.length===11?'full':''}">${s.xi.length}/11</span></h3>
@@ -1242,9 +1267,17 @@ const MS = {
       <span class="addbtn">${inXI?'−':'+'}</span>
       <input class="pnum num" value="${p.num}" onclick="event.stopPropagation()"
         onchange="MS.setNum('${side}','${p.id}',this.value)">
-      <span class="pname">${esc(p.name)}</span>
+      <span class="pname">${esc(p.name)}${this.showUnlinked(side)&&!p.platformId?'<span class="unlinked" title="Not linked to a platform player yet — the sheet still works, but this player will be matched by name on import.">unlinked</span>':''}</span>
       <span class="ppos">${esc(p.pos||'')}</span>
     </div>`;
+  },
+  // Per-player badges only help once MOST of the squad is linked — before then every
+  // row carries one and the signal is lost. Below that, renderSide shows a single
+  // summary line instead.
+  showUnlinked(side){
+    const r=this.cur[side]?.roster||[];
+    if(!r.length) return false;
+    return r.filter(p=>p.platformId).length/r.length >= 0.5;
   },
   // Tap to add/remove from the starting XI — primary interaction (mobile-friendly).
   // When adding, drop the player into the formation slot matching his DEFAULT position
@@ -1342,8 +1375,12 @@ const MS = {
   // Numbers are "sticky": each game's number becomes the player's default until changed again.
   rememberNumber(teamId, player, num){
     const team=this.data.teams.find(t=>t.id===teamId); if(!team) return;
-    // match by source id (stable) first, else by the local id
-    const master=team.players.find(mp=>(player.srcId&&mp.srcId===player.srcId)||mp.id===player.id);
+    // Prefer the platform UUID — the only identifier that is stable across seasons.
+    // Fall back to the SciSports id, then the local id, for rosters not yet linked.
+    const master=team.players.find(mp=>
+      (player.platformId&&mp.platformId===player.platformId)
+      ||(player.srcId&&mp.srcId===player.srcId)
+      ||mp.id===player.id);
     if(master && master.num!==num){ master.num=num; this.persist(); }
   },
 
@@ -1973,8 +2010,14 @@ const MS = {
       const mk=(p,posAbbr,role)=>{
         const onMin=subbedOn[p.id]??null, offMin=subbedOff[p.id]??null;
         return {
-          player_id: p.srcId||'',                 // SciSports/source id (the platform join key)
-          platform_player_id: null,
+          // SciSports/source id — a LOOKUP HINT only. It is unique per
+          // account+season, so the same number resolves to a different person in
+          // another season. Never join on this.
+          player_id: p.srcId||'',
+          // The platform's stable player UUID — the real join key. Empty when the
+          // player has not been linked yet (see the "unlinked" badge in the squad
+          // list); the importer should then fall back to matching by name.
+          platform_player_id: p.platformId||null,
           player_name: p.name,
           position: posAbbr||'',
           position_abbr: posAbbr||'',
@@ -1989,15 +2032,18 @@ const MS = {
       const starters=s.xi.map((p,i)=>mk(p, f.pos[i]||'', 'starter'));
       // anyone brought on as a sub who isn't a starter counts as a sub
       const subPlayers=s.roster.filter(p=>!startIds.has(p.id) && subbedOn[p.id]!==undefined).map(p=>mk(p,'','sub'));
-      // resolve a roster player id → its SciSports/source id for goal/card records
-      const srcOf=(id)=>{ const p=s.roster.find(x=>x.id===id); return p?(p.srcId||''):''; };
+      // resolve a roster player id → the ids the platform needs. Goal/card rows carry
+      // the same pair as the lineup rows so they can be attributed to a player without
+      // relying on the season-scoped SciSports id.
+      const idsOf=(id)=>{ const p=s.roster.find(x=>x.id===id);
+        return {player_id: p?(p.srcId||''):'', platform_player_id: p?(p.platformId||null):null}; };
       const goals=(s.goals||[]).filter(g=>g.player).map(g=>({
-        player_id: srcOf(g.player),
+        ...idsOf(g.player),
         minute: (g.min===''||g.min==null)?null:g.min,
         type: g.kind==='P'?'penalty':g.kind==='OG'?'own_goal':'goal'
       }));
       const cards=(s.cards||[]).filter(c=>c.player).map(c=>({
-        player_id: srcOf(c.player),
+        ...idsOf(c.player),
         minute: (c.min===''||c.min==null)?null:c.min,
         type: c.type==='R'?'red':'yellow'
       }));
@@ -2046,7 +2092,7 @@ const MS = {
       (s.cards||[]).filter(c=>c.player).forEach(c=>{ (cardsBy[c.player]=cardsBy[c.player]||{y:0,r:0})[c.type==='R'?'r':'y']++; });
       const tally=(id)=>({goals:goalsBy[id]||0, yellow:(cardsBy[id]||{}).y||0, red:(cardsBy[id]||{}).r||0});
       s.xi.forEach((p,i)=>rows.push({
-        player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
+        player_id:p.srcId||'', platform_player_id:p.platformId||null, name:p.name, team:s.name, competition:s.league||'',
         match_date:date, formation:fmtFormation(s.formation), position_code:f.pos[i]||'',
         shirt_number:p.num??null, role:'starter',
         sub_off_minute:subOff[p.id]??null, sub_on_minute:null,
@@ -2054,7 +2100,7 @@ const MS = {
         ...tally(p.id)
       }));
       s.roster.filter(p=>!startIds.has(p.id) && subOn[p.id]!==undefined).forEach(p=>rows.push({
-        player_id:p.srcId||'', name:p.name, team:s.name, competition:s.league||'',
+        player_id:p.srcId||'', platform_player_id:p.platformId||null, name:p.name, team:s.name, competition:s.league||'',
         match_date:date, formation:fmtFormation(s.formation), position_code:null,
         shirt_number:p.num??null, role:'sub',
         sub_off_minute:subOff[p.id]??null, sub_on_minute:subOn[p.id]??null,
