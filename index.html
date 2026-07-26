@@ -1170,8 +1170,11 @@ const MS = {
     const hasFixtures=this.data.fixtures && this.data.fixtures.length>0;
     document.getElementById('leagueCard').style.display = (anyLeagues && !hasFixtures) ? '' : 'none';
     this.fillTeams('home'); this.fillTeams('away');
-    if(this.cur.home) document.getElementById('homeSelect').value=this.cur.home.teamId||'';
-    if(this.cur.away) document.getElementById('awaySelect').value=this.cur.away.teamId||'';
+    // Write the value even when no team is picked — an unconditional assignment is what
+    // clears a stale selection after New (the options are rebuilt, but the browser
+    // keeps the previously selected one otherwise).
+    document.getElementById('homeSelect').value=this.cur.home?(this.cur.home.teamId||''):'';
+    document.getElementById('awaySelect').value=this.cur.away?(this.cur.away.teamId||''):'';
   },
   fillTeams(side){
     const list = this.data.teams
@@ -1602,6 +1605,21 @@ const MS = {
     document.getElementById('homeScore').value=0; document.getElementById('awayScore').value=0;
     document.getElementById('referee').value='';
     document.getElementById('matchDate').value=todayDDMMYYYY();
+    // Clear the pickers too, or the previous match's club/teams stay on screen and it
+    // does not look like a new sheet. refreshSelects() only writes the team <select>
+    // values when cur.home/away exist, so with both null the browser would keep the
+    // old selection.
+    this.league='';
+    this._search={home:'',away:''};
+    ['homeSelect','awaySelect','league'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    // Reopen the fixture picker — it collapses to "⟳ Change fixture" once a fixture
+    // is loaded, which would hide the controls on a fresh sheet.
+    this.reopenFixtures();
+    this.onFixType();          // repopulate the competition + match lists from scratch
+    const st=document.getElementById('fixPickStatus'); if(st) st.textContent='';
+    const dn=document.getElementById('draftNote'); if(dn) dn.style.display='none';
     this.refreshSelects(); this.renderSide('home'); this.renderSide('away'); this.showTeam('home'); this.updateStrip();
   },
   // key for one-sheet-per-matchup (home vs away, case-insensitive)
