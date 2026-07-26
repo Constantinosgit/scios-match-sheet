@@ -581,7 +581,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26b</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26c</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -784,9 +784,13 @@ const MS = {
       if(!byTeam.has(team)){ byTeam.set(team,[]); teamLeague.set(team, league); }
       const shirt=iNum>=0?parseInt((row[iNum]||'').trim(),10):NaN;
       const apps=iApps>=0?parseInt((row[iApps]||'').trim(),10):NaN;
+      const hasShirt=Number.isFinite(shirt)&&shirt>0;
       byTeam.get(team).push({id:crypto.randomUUID(),
                              // real squad number when supplied, else import order
-                             num:Number.isFinite(shirt)&&shirt>0?shirt:byTeam.get(team).length+1,
+                             num:hasShirt?shirt:byTeam.get(team).length+1,
+                             // Tells _ingestMany not to renumber this player — without it
+                             // the merge step overwrites the real number with an index.
+                             hasShirt,
                              name, pos:'',
                              srcId:iId>=0?(row[iId]||'').trim():'',
                              platformId:iPid>=0?(row[iPid]||'').trim():'',
@@ -808,9 +812,14 @@ const MS = {
         total+=count; corrected+=corr;
         for(const [team,players] of byTeam){
           if(!all.has(team)){ all.set(team,[]); allLeague.set(team, teamLeague.get(team)||''); }
-          // re-number within the combined team and append
           const arr=all.get(team);
-          players.forEach(pl=>{ pl.num=arr.length+1; arr.push(pl); });
+          // Merging several tabs into one team: only fill in a position number for
+          // players the CSV gave no shirt number for. Renumbering unconditionally here
+          // is what discarded real ShirtNumber values parsed a moment ago.
+          players.forEach(pl=>{
+            if(!pl.hasShirt) pl.num=arr.length+1;
+            arr.push(pl);
+          });
         }
       }catch(err){ errors.push(`${p.name}: ${err.message}`); }
     });
