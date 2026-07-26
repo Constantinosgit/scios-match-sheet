@@ -578,7 +578,10 @@
         <button class="btn-danger" onclick="MS.clearAllTeams()">Clear all</button>
       </div>
       <p class="hint" id="adminHint">Importing players &amp; fixtures and clearing data are <b>admin-only</b> — tap <b>🔒 Admin</b> to unlock. Anyone can build and export match sheets.</p>
-      <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go.</p>
+      <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
+      <!-- Visible build id: the only reliable way to tell whether the browser is
+           running the current deploy or a cached copy of an older one. -->
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26b</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
