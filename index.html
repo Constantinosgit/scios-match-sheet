@@ -581,7 +581,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26d</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-26e</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -689,7 +689,11 @@ const MS = {
       this.persist();
     }
   },
-  persist(){ localStorage.setItem('scios_ms', JSON.stringify(this.data)); },
+  // Any write is a deliberate change by the user, so the bundled data.js must never
+  // be re-applied afterwards. Setting the flag here covers every path that edits
+  // teams (Clear all, Delete team, delete player, import, manual add) rather than
+  // relying on each one to remember.
+  persist(){ this.data.seeded=true; localStorage.setItem('scios_ms', JSON.stringify(this.data)); },
 
   // ---------- tabs ----------
   tab(name){
