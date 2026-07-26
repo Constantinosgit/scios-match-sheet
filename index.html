@@ -142,6 +142,10 @@
     font-weight:700;padding:8px 4px;font-size:15px}
   .player .pname{flex:1;font-size:16px}
   .player .ppos{color:var(--muted);font-size:12px;text-transform:uppercase}
+  /* Bench filter. Inherits the global input styling (16px / 44px keeps iOS from
+     zooming on focus); only the spacing is specific to this spot. */
+  .psearch{width:100%;margin:0 0 6px}
+  .psearch::placeholder{color:var(--muted)}
   /* Marks a player with no platform_player_id. He can still be picked — the badge
      is a reconciliation to-do, not a block. Never printed on the match sheet. */
   .unlinked{margin-left:6px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;
@@ -700,6 +704,16 @@ const MS = {
       const have=new Set(s.roster.map(p=>p.id));
       // add players that exist on the master team but not yet in this sheet's roster
       team.players.forEach(p=>{ if(!have.has(p.id)) s.roster.push({...p}); });
+      // Re-attach identity + shirt from the master roster. A sheet started BEFORE a
+      // roster import holds a copy with no platformId, so it would keep reporting
+      // "not linked" even though the master team now has the ids. Names/numbers the
+      // user edited on the sheet are left alone.
+      const master=new Map(team.players.map(p=>[p.id,p]));
+      [s.roster, s.xi].forEach(list=>list.forEach(p=>{
+        const m=master.get(p.id); if(!m) return;
+        if(!p.platformId && m.platformId) p.platformId=m.platformId;
+        if(!p.srcId && m.srcId) p.srcId=m.srcId;
+      }));
       // drop players removed from the master team (also pull them out of the XI)
       const masterIds=new Set(team.players.map(p=>p.id));
       s.roster=s.roster.filter(p=>masterIds.has(p.id));
@@ -747,7 +761,12 @@ const MS = {
           // only unique per account+season — the same number is a different person in a
           // different season, so it must never be the join key. Optional: rosters
           // exported before the platform had this column simply import unlinked.
-          iPid=col('platform_player_id','platform player id','platformplayerid','player_uuid');
+          iPid=col('platform_player_id','platform player id','platformplayerid','player_uuid'),
+          // Real squad number, when the export carries one. Without it players are
+          // numbered by import order, which is meaningless to a coach.
+          iNum=col('shirtnumber','shirt number','shirt','number','num','jersey number','jersey'),
+          // Sorts the squad so regulars come first instead of alphabetically.
+          iApps=col('appearances','apps','matches_played','matches');
     if(iName<0||iTeam<0) throw new Error('missing Name or TeamName column');
     const byTeam=new Map(); const teamLeague=new Map(); let count=0, corrected=0;
     for(let r=hi+1;r<rows.length;r++){
@@ -760,9 +779,15 @@ const MS = {
       if(!team||!name) continue;
       if(corr) corrected++;
       if(!byTeam.has(team)){ byTeam.set(team,[]); teamLeague.set(team, league); }
-      byTeam.get(team).push({id:crypto.randomUUID(), num:byTeam.get(team).length+1, name, pos:'',
+      const shirt=iNum>=0?parseInt((row[iNum]||'').trim(),10):NaN;
+      const apps=iApps>=0?parseInt((row[iApps]||'').trim(),10):NaN;
+      byTeam.get(team).push({id:crypto.randomUUID(),
+                             // real squad number when supplied, else import order
+                             num:Number.isFinite(shirt)&&shirt>0?shirt:byTeam.get(team).length+1,
+                             name, pos:'',
                              srcId:iId>=0?(row[iId]||'').trim():'',
-                             platformId:iPid>=0?(row[iPid]||'').trim():''});
+                             platformId:iPid>=0?(row[iPid]||'').trim():'',
+                             apps:Number.isFinite(apps)?apps:null});
       count++;
     }
     if(!count) throw new Error('no player rows found under the header');
@@ -1047,6 +1072,27 @@ const MS = {
     const d=this.dupNumbers(players);
     return d.length ? `<div class="warn no-print">⚠ Duplicate shirt number${d.length>1?'s':''}: ${d.join(', ')} — more than one player shares the same number.</div>` : '';
   },
+  // Bench search text, per side. Not part of the sheet — never saved or exported.
+  _search:{home:'',away:''},
+  setSearch(side,v){
+    this._search[side]=v;
+    const box=document.getElementById('bench-'+side); if(!box) return;
+    const s=this.cur[side]; if(!s) return;
+    const ids=new Set(s.xi.map(x=>x.id));
+    const shown=this.filterPlayers(s.roster.filter(p=>!ids.has(p.id)), v);
+    // Repaint only the bench so the search box keeps focus and the caret position.
+    box.innerHTML = shown.map(p=>this.playerHTML(side,p,'bench')).join('')
+      || (v ? '<div class="empty">No player matches “'+esc(v)+'”</div>'
+            : '<div class="empty">All players are in the XI</div>');
+  },
+  // Accent-insensitive substring match on the name, plus exact-prefix on the shirt
+  // number so typing "10" finds #10 rather than every name containing a 1 or 0.
+  filterPlayers(list,q){
+    const t=(q||'').trim(); if(!t) return list;
+    const fold=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const n=fold(t);
+    return list.filter(p=>fold(p.name).includes(n) || String(p.num??'').startsWith(t));
+  },
   // How much of this squad resolves to a platform player. Purely informational: an
   // unlinked player can still be picked and exported, he is just matched by name on
   // import instead of by id. Hidden once the whole squad is linked.
@@ -1193,6 +1239,9 @@ const MS = {
     if(!s){ panel.innerHTML='<div class="empty">Select a team above.</div>'; return; }
     const benchIds=new Set(s.xi.map(x=>x.id));
     const bench=s.roster.filter(p=>!benchIds.has(p.id));
+    // Squads run to 60 players, so scrolling to find someone is slow. Filter by name
+    // or shirt number; accent- and case-insensitive so "jose" finds "José".
+    const shown=this.filterPlayers(bench, this._search[side]);
     // In fill mode (opened from an empty-sheet link) show a banner + "Send back" button.
     const fillBanner=(this._fillMode && side==='home') ? `
       <div class="card no-print" style="background:#0e2a1c;border:1px solid #1E8449;margin-bottom:12px">
@@ -1234,8 +1283,13 @@ const MS = {
         </div>
         <div class="listcol">
           <h3>Bench <span class="xi-count">tap to add</span></h3>
+          <input class="psearch no-print" id="search-${side}" type="search" autocomplete="off"
+            placeholder="Search ${bench.length} players…" value="${esc(this._search[side]||'')}"
+            oninput="MS.setSearch('${side}',this.value)">
           <div class="dropzone" id="bench-${side}" ondragover="MS.over(event)" ondragleave="MS.leave(event)" ondrop="MS.drop(event,'${side}','bench')">
-            ${bench.map(p=>this.playerHTML(side,p,'bench')).join('')||'<div class="empty">All players are in the XI</div>'}
+            ${shown.map(p=>this.playerHTML(side,p,'bench')).join('')
+              || (this._search[side] ? '<div class="empty">No player matches “'+esc(this._search[side])+'”</div>'
+                                     : '<div class="empty">All players are in the XI</div>')}
           </div>
         </div>
       </div>
