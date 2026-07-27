@@ -583,7 +583,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-27b</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-27c</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -1433,49 +1433,27 @@ const MS = {
   },
   subHTML(side,sub,i){
     const {offPool, onPool}=this.subEligibility(side,i);
-    // Type-to-search instead of a plain <select>: a 64-player squad is unusable as a
-    // dropdown. A native <datalist> filters as you type and still works by tapping
-    // the arrow on mobile. The visible value is "<number> <name>"; setSubByLabel maps
-    // it back to the player id.
-    const label=(pool,id)=>{ const p=pool.find(x=>x.id===id); return p?`${p.num} ${p.name}`:''; };
-    const opts=(pool)=>pool.map(p=>`<option value="${esc(p.num+' '+p.name)}"></option>`).join('');
-    const offId=`off-${side}-${i}`, onId=`on-${side}-${i}`;
+    // Type-to-search rather than a plain <select> — see pickerHTML. The off/on pools
+    // are the players eligible at this point in the match, not the whole roster.
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--red)">↓</span>
-      <input class="subpick" list="${offId}" placeholder="off — type a name…" autocomplete="off"
-        value="${esc(label(offPool,sub.off))}"
-        onchange="MS.setSubByLabel('${side}',${i},'off',this.value)">
-      <datalist id="${offId}">${opts(offPool)}</datalist>
+      ${this.pickerHTML(offPool, sub.off, `off-${side}-${i}`,
+                        `MS.setSubByLabel('${side}',${i},'off',this.value)`, 'off — type a name…')}
       <span class="arrow" style="color:var(--green)">↑</span>
-      <input class="subpick" list="${onId}" placeholder="on — type a name…" autocomplete="off"
-        value="${esc(label(onPool,sub.on))}"
-        onchange="MS.setSubByLabel('${side}',${i},'on',this.value)">
-      <datalist id="${onId}">${opts(onPool)}</datalist>
+      ${this.pickerHTML(onPool, sub.on, `on-${side}-${i}`,
+                        `MS.setSubByLabel('${side}',${i},'on',this.value)`, 'on — type a name…')}
       <button class="btn-danger no-print" onclick="MS.delSub('${side}',${i})">✕</button>
     </div>`;
   },
-  // Resolve what was typed in a substitution box back to a player id. Accepts the
-  // exact "<number> <name>" label, or any unambiguous partial name / shirt number, so
-  // typing "orfan" or "13" works without picking from the list.
   setSubByLabel(side,i,which,text){
     const {offPool, onPool}=this.subEligibility(side,i);
-    const pool = which==='off' ? offPool : onPool;
-    const t=(text||'').trim();
-    if(!t){ this.setSub(side,i,which,''); return; }
-    const fold=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-    const n=fold(t);
-    let hit = pool.find(p=>fold(p.num+' '+p.name)===n)
-           || pool.find(p=>fold(p.name)===n)
-           || pool.find(p=>String(p.num)===t);
-    if(!hit){
-      const partial=pool.filter(p=>fold(p.name).includes(n));
-      if(partial.length===1) hit=partial[0];
-    }
-    // No match, or an ambiguous one: clear the row rather than guess, and repaint so
-    // the box shows the real state instead of the stray text.
-    this.setSub(side,i,which,hit?hit.id:'');
+    const id=this.resolvePlayer(which==='off'?offPool:onPool, text);
+    this.setSub(side,i,which,id);
+    // Repaint so an unmatched or ambiguous entry shows the real state, and so the
+    // other rows' eligible pools update (subbing a player off changes who can come on).
     this.renderSubs(side);
+    this.renderPitch(side);
   },
   renderPitch(side){
     const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
@@ -1595,11 +1573,43 @@ const MS = {
     return this.cur[side].roster
       .map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
   },
+  // Type-to-search player picker, shared by substitutions, goals and cards. A plain
+  // <select> over a 64-player squad means scrolling the whole roster; a <datalist>
+  // filters as you type and still opens the full list on a tap.
+  //   pool     players to choose from
+  //   selId    currently selected player id
+  //   listId   unique id for this row's <datalist>
+  //   onChange JS expression called with the typed text
+  pickerHTML(pool, selId, listId, onChange, placeholder){
+    const sel=pool.find(p=>p.id===selId);
+    const value=sel?`${sel.num} ${sel.name}`:'';
+    return `<input class="subpick" list="${listId}" placeholder="${esc(placeholder)}" autocomplete="off"
+        value="${esc(value)}" onchange="${onChange}">
+      <datalist id="${listId}">${pool.map(p=>`<option value="${esc(p.num+' '+p.name)}"></option>`).join('')}</datalist>`;
+  },
+  // Resolve typed text back to a player id: the exact "<number> <name>" label, an
+  // exact name, an exact shirt number, or an unambiguous partial name. Returns '' when
+  // nothing matches or the term is ambiguous — better blank than the wrong player.
+  resolvePlayer(pool, text){
+    const t=(text||'').trim();
+    if(!t) return '';
+    const fold=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const n=fold(t);
+    let hit = pool.find(p=>fold(p.num+' '+p.name)===n)
+           || pool.find(p=>fold(p.name)===n)
+           || pool.find(p=>String(p.num)===t);
+    if(!hit){
+      const partial=pool.filter(p=>fold(p.name).includes(n));
+      if(partial.length===1) hit=partial[0];
+    }
+    return hit?hit.id:'';
+  },
   goalHTML(side,g,i){
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--green)">⚽</span>
-      <select onchange="MS.setGoal('${side}',${i},'player',this.value)"><option value="">scorer…</option>${this.playerOptions(side,g.player)}</select>
+      ${this.pickerHTML(this.cur[side].roster, g.player, `goal-${side}-${i}`,
+                        `MS.setGoalByLabel('${side}',${i},this.value)`, 'scorer — type a name…')}
       <select class="ev-kind" onchange="MS.setGoal('${side}',${i},'kind',this.value)">
         <option value="" ${!g.kind?'selected':''}>Normal</option>
         <option value="P" ${g.kind==='P'?'selected':''}>Penalty</option>
@@ -1607,6 +1617,30 @@ const MS = {
       </select>
       <button class="btn-danger no-print" onclick="MS.delGoal('${side}',${i})">✕</button>
     </div>`;
+  },
+  // Scorer typed into the search box → player id. Repaints the row so an unmatched
+  // or ambiguous entry is replaced by the real state rather than left as stray text.
+  setGoalByLabel(side,i,text){
+    const id=this.resolvePlayer(this.cur[side].roster, text);
+    this.setGoal(side,i,'player',id);
+    this.renderGoals(side);
+    this.renderPitch(side);   // goal markers sit on the pitch dots
+  },
+  setCardByLabel(side,i,text){
+    const id=this.resolvePlayer(this.cur[side].roster, text);
+    this.setCard(side,i,'player',id);
+    this.renderCards(side);
+    this.renderPitch(side);   // card markers sit on the pitch dots
+  },
+  // Repaint just one event list, so editing a row does not re-render (and scroll) the
+  // whole side.
+  renderGoals(side){
+    const box=document.getElementById('goals-'+side); const s=this.cur[side];
+    if(box && s) box.innerHTML=s.goals.map((g,i)=>this.goalHTML(side,g,i)).join('');
+  },
+  renderCards(side){
+    const box=document.getElementById('cards-'+side); const s=this.cur[side];
+    if(box && s) box.innerHTML=s.cards.map((c,i)=>this.cardHTML(side,c,i)).join('');
   },
   addGoal(side){ this.cur[side].goals.push({min:'',player:'',kind:''}); this.renderSide(side); this.syncScore(); this.touch(); },
   setGoal(side,i,field,val){
@@ -1635,7 +1669,8 @@ const MS = {
   cardHTML(side,c,i){
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${c.min??''}" onchange="MS.setCard('${side}',${i},'min',this.value)">
-      <select onchange="MS.setCard('${side}',${i},'player',this.value)"><option value="">player…</option>${this.playerOptions(side,c.player)}</select>
+      ${this.pickerHTML(this.cur[side].roster, c.player, `card-${side}-${i}`,
+                        `MS.setCardByLabel('${side}',${i},this.value)`, 'player — type a name…')}
       <select class="ev-kind" onchange="MS.setCard('${side}',${i},'type',this.value)">
         <option value="Y" ${c.type!=='R'?'selected':''}>🟨 Yellow</option>
         <option value="R" ${c.type==='R'?'selected':''}>🟥 Red</option>
