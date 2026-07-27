@@ -210,6 +210,8 @@
   /* subs / goals / cards editor rows */
   .sub-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
   .sub-row select{flex:1;min-width:120px}
+  /* Type-to-search player pickers — same footprint as the selects they replaced. */
+  .sub-row .subpick{flex:1;min-width:120px}
   .sub-row .min{width:64px;flex:none}
   .sub-row .arrow{color:var(--muted)}
   .sub-row .ev-kind{flex:0 0 auto;min-width:110px}   /* Normal/Pen/OG, Yellow/Red — sized to content */
@@ -581,7 +583,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-27a</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-07-27b</b> · shirt numbers from CSV</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -1431,15 +1433,49 @@ const MS = {
   },
   subHTML(side,sub,i){
     const {offPool, onPool}=this.subEligibility(side,i);
-    const opt=(pool,sel)=>pool.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
+    // Type-to-search instead of a plain <select>: a 64-player squad is unusable as a
+    // dropdown. A native <datalist> filters as you type and still works by tapping
+    // the arrow on mobile. The visible value is "<number> <name>"; setSubByLabel maps
+    // it back to the player id.
+    const label=(pool,id)=>{ const p=pool.find(x=>x.id===id); return p?`${p.num} ${p.name}`:''; };
+    const opts=(pool)=>pool.map(p=>`<option value="${esc(p.num+' '+p.name)}"></option>`).join('');
+    const offId=`off-${side}-${i}`, onId=`on-${side}-${i}`;
     return `<div class="sub-row">
       <input class="min" type="number" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--red)">↓</span>
-      <select onchange="MS.setSub('${side}',${i},'off',this.value)"><option value="">off…</option>${opt(offPool,sub.off)}</select>
+      <input class="subpick" list="${offId}" placeholder="off — type a name…" autocomplete="off"
+        value="${esc(label(offPool,sub.off))}"
+        onchange="MS.setSubByLabel('${side}',${i},'off',this.value)">
+      <datalist id="${offId}">${opts(offPool)}</datalist>
       <span class="arrow" style="color:var(--green)">↑</span>
-      <select onchange="MS.setSub('${side}',${i},'on',this.value)"><option value="">on…</option>${opt(onPool,sub.on)}</select>
+      <input class="subpick" list="${onId}" placeholder="on — type a name…" autocomplete="off"
+        value="${esc(label(onPool,sub.on))}"
+        onchange="MS.setSubByLabel('${side}',${i},'on',this.value)">
+      <datalist id="${onId}">${opts(onPool)}</datalist>
       <button class="btn-danger no-print" onclick="MS.delSub('${side}',${i})">✕</button>
     </div>`;
+  },
+  // Resolve what was typed in a substitution box back to a player id. Accepts the
+  // exact "<number> <name>" label, or any unambiguous partial name / shirt number, so
+  // typing "orfan" or "13" works without picking from the list.
+  setSubByLabel(side,i,which,text){
+    const {offPool, onPool}=this.subEligibility(side,i);
+    const pool = which==='off' ? offPool : onPool;
+    const t=(text||'').trim();
+    if(!t){ this.setSub(side,i,which,''); return; }
+    const fold=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const n=fold(t);
+    let hit = pool.find(p=>fold(p.num+' '+p.name)===n)
+           || pool.find(p=>fold(p.name)===n)
+           || pool.find(p=>String(p.num)===t);
+    if(!hit){
+      const partial=pool.filter(p=>fold(p.name).includes(n));
+      if(partial.length===1) hit=partial[0];
+    }
+    // No match, or an ambiguous one: clear the row rather than guess, and repaint so
+    // the box shows the real state instead of the stray text.
+    this.setSub(side,i,which,hit?hit.id:'');
+    this.renderSubs(side);
   },
   renderPitch(side){
     const s=this.cur[side]; const pitch=document.getElementById('pitch-'+side);
@@ -1472,9 +1508,26 @@ const MS = {
   setFormation(side,f){ this.cur[side].formation=f; this.renderSide(side); this.touch(); },
   setNum(side,pid,val){
     const n=parseInt(val)||0;
-    const p=this.cur[side].roster.find(p=>p.id===pid);
-    if(p){ p.num=n; this.rememberNumber(this.cur[side].teamId, p, n); }
-    this.renderPitch(side); this.touch();
+    const s=this.cur[side];
+    const p=s.roster.find(p=>p.id===pid);
+    if(p){
+      p.num=n;
+      // The XI holds its own player objects, so update the matching entry too or the
+      // pitch keeps the old number.
+      const inXI=s.xi.find(x=>x.id===pid); if(inXI) inXI.num=n;
+      this.rememberNumber(s.teamId, p, n);
+    }
+    this.renderPitch(side);
+    // Substitution dropdowns show "<number> <name>", so they go stale after an edit.
+    this.renderSubs(side);
+    this.touch();
+  },
+  // Repaint just the substitution rows — used after a shirt-number edit so the
+  // dropdown labels stay in step without re-rendering (and scrolling) the whole side.
+  renderSubs(side){
+    const box=document.getElementById('subs-'+side);
+    const s=this.cur[side];
+    if(box && s) box.innerHTML=s.subs.map((sub,i)=>this.subHTML(side,sub,i)).join('');
   },
   // Persist a player's shirt number back to the master roster so it's the default next time.
   // Numbers are "sticky": each game's number becomes the player's default until changed again.
