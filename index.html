@@ -583,7 +583,7 @@
       <p class="hint">Players come from the Cyprus Operation Sheet ("Corrected players" tab → File ▸ Download ▸ CSV); fixtures from the "Fixture Import" tab. The tool uses the <b>Correct name</b> where present, groups players by <b>TeamName</b>, and saves everything on this device. <b>You can select several CSVs at once</b> (one per tab) — they're merged in one go. A <b>ShirtNumber</b> column is used when present, otherwise players are numbered in import order.</p>
       <!-- Visible build id: the only reliable way to tell whether the browser is
            running the current deploy or a cached copy of an older one. -->
-      <p class="hint" style="color:var(--muted)">Build <b>2026-07-27c</b> · shirt numbers from CSV</p>
+      <p class="hint" style="color:var(--muted)">Build <b>2026-09-27a</b> · Omonoia Aradippou academy</p>
       <div id="importStatus" class="hint" style="color:var(--cyan)"></div>
       <div id="fixStatus" class="hint" style="color:var(--cyan)"></div>
       <div class="row" style="margin-top:10px;gap:10px">
@@ -693,6 +693,26 @@ const MS = {
       this.data.seeded = true;
       this.persist();
     }
+    this.addBundledTeams();
+  },
+  // Teams added to data.js after launch. Devices that were seeded earlier never re-read
+  // the bundle, so these are topped up once per device. Each id is recorded in
+  // `addedTeams` so a team the user later deletes does not come back; a device that
+  // did Clear all (no teams) is left alone.
+  NEW_BUNDLED_TEAMS:['omar-u14','omar-u15','omar-u16','omar-u17'],
+  addBundledTeams(){
+    const bundle=(window.SCIOS_DATA&&window.SCIOS_DATA.teams)||[];
+    if(!this.data.teams.length) return;
+    const done=new Set(this.data.addedTeams||[]);
+    const have=new Set(this.data.teams.map(t=>t.id));
+    let changed=false;
+    this.NEW_BUNDLED_TEAMS.forEach(id=>{
+      if(done.has(id)) return;
+      const t=bundle.find(x=>x.id===id); if(!t) return;
+      if(!have.has(id)) this.data.teams.push(JSON.parse(JSON.stringify(t)));
+      done.add(id); changed=true;
+    });
+    if(changed){ this.data.addedTeams=[...done]; this.persist(); }
   },
   // Any write is a deliberate change by the user, so the bundled data.js must never
   // be re-applied afterwards. Setting the flag here covers every path that edits
@@ -2454,9 +2474,9 @@ function posOptionsHTML(sel){
 
 // ---- team logos ----
 // Known logo files in logos/ (base names, .png). Used to resolve a team → crest.
-const LOGO_FILES=["AEK","AEL","AEZ","APEA","APOEL","APOP","ASIL","Achyronas","Alki","Anagennisi","Anorthosis","Apollon","Aris","Armenia","Ayia Napa","Chalkanoras","Cyprus","Digenis","Doxa","ENP","Ethnikos Achnas","Ethnikos Assias","Ethnikos Latsion","Finland","Iraklis","Karmiotissa","Kazakhstan","Kosovo","Lithuania","MEAP","Nea Salamina","Netherlands","North Macedonia","Northern Ireland","Ermis","Olympiakos","Omonoia 29M","Omonoia","Othellos","PAEEK","Pafos","Peyia","Republic of Ireland","Romania","San Marino","Spain","Spartakos"];
+const LOGO_FILES=["AEK","AEL","AEZ","APEA","APOEL","APOP","ASIL","Achyronas","Alki","Anagennisi","Anorthosis","Apollon","Aris","Armenia","Ayia Napa","Chalkanoras","Cyprus","Digenis","Doxa","ENP","Ethnikos Achnas","Ethnikos Assias","Ethnikos Latsion","Finland","Iraklis","Karmiotissa","Kazakhstan","Kosovo","Lithuania","MEAP","Nea Salamina","Netherlands","North Macedonia","Northern Ireland","Ermis","Olympiakos","Omonoia 29M","Omonoia","Omonoia Aradippou","Othellos","PAEEK","Pafos","Peyia","Republic of Ireland","Romania","San Marino","Spain","Spartakos"];
 // Spelling variants in team data → logo file base name.
-const LOGO_ALIASES={"omonia":"Omonoia","omonia nicosia":"Omonoia","omonoia nicosia":"Omonoia","omonia aradippou":"Omonoia 29M","ethnikos":"Ethnikos Achnas",
+const LOGO_ALIASES={"omonia":"Omonoia","omonia nicosia":"Omonoia","omonoia nicosia":"Omonoia","omonia aradippou":"Omonoia Aradippou","omonoia aradippou":"Omonoia Aradippou","ethnikos":"Ethnikos Achnas",
   // full club names → uploaded logo file (short names / spelling variants)
   "apop polis chrysochous":"APOP","apop":"APOP",
   "alki oroklini":"Alki","alki oroklini (-2023)":"Alki","alki":"Alki",
