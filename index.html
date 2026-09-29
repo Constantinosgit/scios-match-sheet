@@ -1933,10 +1933,8 @@ const MS = {
       const benchList=s.roster.filter(p=>!xiIds.has(p.id) && ev[p.id] && ev[p.id].on!=null)
         .map(p=>`<div class="ps-row"><span class="ps-num">${p.num}</span><span class="ps-name">${esc(p.name)}</span>${this.eventTags(ev[p.id])}</div>`).join('');
       const nameOf=(id)=>id?((s.roster.find(p=>p.id===id)||{}).name||''):'';
-      const goals=(s.goals||[]).filter(g=>g.player).map(g=>{
-        const tag=g.kind==='P'?' (Penalty)':g.kind==='OG'?' (Own Goal)':'';
-        return `<div class="ps-sub"><b>${g.min||'?'}'</b> ⚽ ${esc(nameOf(g.player))}${tag}</div>`;
-      }).join('');
+      // No separate Goals list: goals already sit next to each scorer (pitch + rows), and a
+      // list under the team read an own goal as that team's goal.
       const cards=(s.cards||[]).filter(c=>c.player).map(c=>{
         const R=c.type==='R'; const mark=R?'🟥':'🟨';
         return `<div class="ps-sub"><b>${c.min||'?'}'</b> ${mark} ${R?'(Red)':'(Yellow)'} ${esc(nameOf(c.player))}</div>`;
@@ -1952,7 +1950,6 @@ const MS = {
         </div>`:`<div class="ps-subs-h" style="margin-bottom:3px">Starting XI</div>`}
         <div class="ps-xi">${xiList}</div>
         ${benchList?`<div class="ps-subs"><div class="ps-subs-h">Substitutes used</div><div class="ps-xi">${benchList}</div></div>`:''}
-        ${goals?`<div class="ps-subs"><div class="ps-subs-h">Goals</div>${goals}</div>`:''}
         ${cards?`<div class="ps-subs"><div class="ps-subs-h">Cards</div>${cards}</div>`:''}
       </div>`;
     };
