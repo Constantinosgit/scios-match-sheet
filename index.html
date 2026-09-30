@@ -220,6 +220,27 @@
   .sub-row .min{width:64px;flex:none}
   .sub-row .arrow{color:var(--muted)}
   .sub-row .ev-kind{flex:0 0 auto;min-width:110px}   /* Normal/Pen/OG, Yellow/Red — sized to content */
+  /* match events timeline: minute · team · type · ✕ on top, player(s) underneath */
+  .ev-row{display:grid;grid-template-columns:64px minmax(0,1fr) minmax(0,150px) auto;gap:6px;align-items:center;
+    grid-template-areas:"min team kind del" "who who who who" "note note note note";
+    padding:8px;margin-bottom:6px;border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:8px;background:var(--surface2)}
+  .ev-row.ev-away{border-left-color:var(--amber)}
+  .ev-row select,.ev-row input{min-width:0;width:100%}
+  .ev-row .ev-team-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ev-row .min{grid-area:min}.ev-row .ev-team,.ev-row .ev-team-name{grid-area:team}
+  .ev-row .ev-kind{grid-area:kind}.ev-row .btn-danger{grid-area:del}
+  .ev-row .ev-who{grid-area:who;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .ev-row .ev-pick{display:flex;gap:6px;align-items:center;flex:1 1 200px;min-width:0}
+  .ev-row .ev-who .subpick{flex:1;min-width:0}
+  .ev-row .ev-note{grid-area:note;font-size:12px;color:var(--text2)}
+  @media(max-width:760px){
+    /* phone: minute · type · ✕, then the team on its own line, then the player(s) */
+    .ev-row{grid-template-columns:72px minmax(0,1fr) auto;
+      grid-template-areas:"min kind del" "team team team" "who who who" "note note note"}
+    .ev-row .ev-pick{flex-basis:100%}
+  }
+  body.fillmode #eventsCard{display:none!important}
 
   .saved-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--border);
     border-radius:8px;margin-bottom:6px;background:var(--surface2);flex-wrap:wrap}
@@ -563,6 +584,7 @@
       <div class="card teampanel" id="homePanel" data-side="home"></div>
       <div class="card teampanel" id="awayPanel" data-side="away"></div>
     </div>
+    <div class="card no-print" id="eventsCard" style="display:none"></div>
   </section>
 
   <!-- ===== TEAMS TAB ===== -->
@@ -1368,7 +1390,7 @@ const MS = {
   renderSide(side){
     const panel=document.getElementById(side+'Panel');
     const s=this.cur[side];
-    if(!s){ panel.innerHTML='<div class="empty">Select a team above.</div>'; return; }
+    if(!s){ panel.innerHTML='<div class="empty">Select a team above.</div>'; this.renderEvents(); return; }
     const benchIds=new Set(s.xi.map(x=>x.id));
     const bench=s.roster.filter(p=>!benchIds.has(p.id));
     // Squads run to 60 players, so scrolling to find someone is slow. Filter by name
@@ -1424,6 +1446,15 @@ const MS = {
           <button class="btn-ghost no-print" onclick="MS.newPlayer('${side}')" style="margin-top:6px">+ New player</button>
         </div>
       </div>
+      ${this._fillMode ? this.sideEventsHTML(side) : ''}`;
+    this.renderPitch(side);
+    this.renderEvents();
+  },
+  // Per-team Subs / Goals / Cards boxes. Only the coach link uses these now — the full
+  // tool enters every event on one timeline (renderEvents), the way CFA reports them.
+  sideEventsHTML(side){
+    const s=this.cur[side];
+    return `
       <div style="margin-top:14px">
         <h3 style="font-size:13px;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Substitutions <span class="xi-count">${s.subs.length}/${MAX_SUBS}</span></h3>
         <div id="subs-${side}">${s.subs.map((sub,i)=>this.subHTML(side,sub,i)).join('')}</div>
@@ -1441,7 +1472,6 @@ const MS = {
         <div id="cards-${side}">${s.cards.map((c,i)=>this.cardHTML(side,c,i)).join('')}</div>
         <button class="btn-ghost no-print" onclick="MS.addCard('${side}')" style="margin-top:6px">+ Card</button>
       </div>`;
-    this.renderPitch(side);
   },
   playerHTML(side,p,zone){
     // zone 'xi' → tapping removes; zone 'bench' → tapping adds. Drag still works on desktop.
@@ -1592,6 +1622,7 @@ const MS = {
   // Repaint just the substitution rows — used after a shirt-number edit so the
   // dropdown labels stay in step without re-rendering (and scrolling) the whole side.
   renderSubs(side){
+    if(!this._fillMode) return this.renderEvents();
     const box=document.getElementById('subs-'+side);
     const s=this.cur[side];
     if(box && s) box.innerHTML=s.subs.map((sub,i)=>this.subHTML(side,sub,i)).join('');
@@ -1639,12 +1670,121 @@ const MS = {
     // the whole substitution sequence in minute order (subbed-off players disappear,
     // subbed-on players become available to come off later). 'change' fires on blur so
     // re-rendering the minute field doesn't disrupt typing.
-    const el=document.getElementById('subs-'+side);
-    if(el) el.innerHTML=this.cur[side].subs.map((sub,j)=>this.subHTML(side,sub,j)).join('');
+    this.renderSubs(side);
     // refresh the pitch so the subbed-off player shows his ↓minute marker
     this.renderPitch(side);
   },
   delSub(side,i){ this.cur[side].subs.splice(i,1); this.renderSide(side); this.touch(); },
+
+  // ---------- match events timeline ----------
+  // One list for both teams in minute order — CFA sends events this way, so Marios types
+  // straight down the report instead of hopping between six boxes. Underneath, each
+  // event still lives in its team's subs / goals / cards, so the pitch, score, PDF and
+  // SciSports export are unchanged. A row is addressed by (side, kind, index).
+  _evSide:'home',   // team for the next added event: the last one used
+  evList(){
+    const out=[], order={sub:0,goal:1,card:2};
+    ['home','away'].forEach(side=>{
+      const s=this.cur[side]; if(!s) return;
+      (s.subs||[]).forEach((x,i)=>out.push({side,kind:'sub',i,x}));
+      (s.goals||[]).forEach((x,i)=>out.push({side,kind:'goal',i,x}));
+      (s.cards||[]).forEach((x,i)=>out.push({side,kind:'card',i,x}));
+    });
+    // Minute order; rows still waiting for a minute stay at the bottom, oldest first.
+    const m=e=>{ const v=parseInt(e.x.min); return Number.isFinite(v)?v:1e6; };
+    return out.sort((a,b)=>m(a)-m(b) || (a.x._n||0)-(b.x._n||0) || order[a.kind]-order[b.kind] || a.i-b.i);
+  },
+  evType(e){ return e.kind==='sub'?'sub' : e.kind==='goal'?(e.x.kind||'G') : (e.x.type==='R'?'R':'Y'); },
+  evRowHTML(e){
+    const {side,kind,i,x}=e, t=this.evType(e), H=this.cur.home, A=this.cur.away;
+    const args=`'${side}','${kind}',${i}`;
+    const opt=(v,l)=>`<option value="${v}" ${t===v?'selected':''}>${l}</option>`;
+    const teamSel = (H&&A) ? `<select class="ev-team" onchange="MS.evSetSide(${args},this.value)" title="Team of the player">
+        <option value="home" ${side==='home'?'selected':''}>${esc(H.name)}</option>
+        <option value="away" ${side==='away'?'selected':''}>${esc(A.name)}</option></select>`
+      : `<span class="ev-team-name">${esc(this.cur[side].name)}</span>`;
+    let who;
+    if(kind==='sub'){
+      const {offPool,onPool}=this.subEligibility(side,i);
+      who=`<span class="ev-pick"><span class="arrow" style="color:var(--red)">↓</span>
+        ${this.pickerHTML(offPool, x.off, `evoff-${side}-${i}`, `MS.setSubByLabel('${side}',${i},'off',this.value)`, 'off — name or number…')}</span>
+        <span class="ev-pick"><span class="arrow" style="color:var(--green)">↑</span>
+        ${this.pickerHTML(onPool, x.on, `evon-${side}-${i}`, `MS.setSubByLabel('${side}',${i},'on',this.value)`, 'on — name or number…')}</span>`;
+    } else if(kind==='goal'){
+      who=this.pickerHTML(this.cur[side].roster, x.player, `evgoal-${side}-${i}`, `MS.setGoalByLabel('${side}',${i},this.value)`, 'scorer — name or number…');
+    } else {
+      who=this.pickerHTML(this.cur[side].roster, x.player, `evcard-${side}-${i}`, `MS.setCardByLabel('${side}',${i},this.value)`, 'player — name or number…');
+    }
+    return `<div class="ev-row ev-${side}">
+      <input class="min" id="evmin-${side}-${kind}-${i}" type="number" inputmode="numeric" placeholder="min" value="${x.min??''}"
+        onchange="MS.evSetMin(${args},this.value)">
+      ${teamSel}
+      <select class="ev-kind" onchange="MS.evSetType(${args},this.value)">
+        ${opt('sub','⇄ Sub')}${opt('G','⚽ Goal')}${opt('P','⚽ Penalty')}${opt('OG','⚽ Own goal')}${opt('Y','🟨 Yellow')}${opt('R','🟥 Red')}
+      </select>
+      <button class="btn-danger" onclick="MS.evDel(${args})" title="Remove">✕</button>
+      <div class="ev-who">${who}</div>
+      ${t==='OG'?`<div class="ev-note">Pick the team and player who put it into his own net — it counts for the other team.</div>`:''}
+    </div>`;
+  },
+  renderEvents(){
+    const box=document.getElementById('eventsCard'); if(!box) return;
+    const H=this.cur.home, A=this.cur.away;
+    if(this._fillMode || (!H&&!A)){ box.style.display='none'; box.innerHTML=''; return; }
+    box.style.display='';
+    const rows=this.evList();
+    const subCount=side=>this.cur[side]?`${esc(this.cur[side].name)} ${this.cur[side].subs.length}/${MAX_SUBS}`:'';
+    box.innerHTML=`
+      <h3 style="margin-bottom:4px">Match events <span class="xi-count">${rows.length}</span></h3>
+      <div class="hint" style="margin:0 0 10px">Subs, goals and cards for both teams, in minute order — type them straight down the CFA report. Subs used: ${[subCount('home'),subCount('away')].filter(Boolean).join(' · ')}</div>
+      ${rows.map(e=>this.evRowHTML(e)).join('') || '<div class="empty">No events yet.</div>'}
+      <div class="row" style="margin-top:8px">
+        <button class="btn-ghost" onclick="MS.evAdd('sub')">+ Sub</button>
+        <button class="btn-ghost" onclick="MS.evAdd('goal')">+ Goal</button>
+        <button class="btn-ghost" onclick="MS.evAdd('card')">+ Card</button>
+      </div>`;
+  },
+  _evN:0,   // creation order, so rows without a minute keep the order they were added
+  evItem(fields,n){ Object.defineProperty(fields,'_n',{value:n,enumerable:false,writable:true}); return fields; },  // _n is never saved/exported
+  evAdd(kind){
+    const side=this.cur[this._evSide]?this._evSide:(this.cur.home?'home':'away');
+    const s=this.cur[side]; if(!s) return;
+    if(kind==='sub' && s.subs.length>=MAX_SUBS){ alert(`${s.name} has used all ${MAX_SUBS} substitutions.`); return; }
+    const item=this.evItem(kind==='sub'?{min:'',off:'',on:''} : kind==='goal'?{min:'',player:'',kind:''} : {min:'',player:'',type:'Y'}, ++this._evN);
+    const arr=this.evArr(side,kind); arr.push(item);
+    this.renderEvents(); this.touch();
+    const el=document.getElementById(`evmin-${side}-${kind}-${arr.length-1}`); if(el) el.focus();
+  },
+  evArr(side,kind){ return this.cur[side][kind==='sub'?'subs':kind==='goal'?'goals':'cards']; },
+  evAfter(){ this.syncScore(); this.renderPitch('home'); this.renderPitch('away'); this.renderEvents(); this.touch(); },
+  evSetMin(side,kind,i,val){ this.evArr(side,kind)[i].min=parseInt(val)||''; this.evAfter(); },
+  evDel(side,kind,i){ this.evArr(side,kind).splice(i,1); this.evAfter(); },
+  // Change the type. Within goals or cards it is a field; across kinds the event moves
+  // to the other list, keeping its minute (and the player, where it still fits).
+  evSetType(side,kind,i,t){
+    const nk = t==='sub'?'sub' : (t==='Y'||t==='R')?'card' : 'goal';
+    const x=this.evArr(side,kind)[i];
+    if(nk===kind){
+      if(kind==='goal') x.kind = t==='G'?'':t;
+      if(kind==='card') x.type = t;
+      return this.evAfter();
+    }
+    if(nk==='sub' && this.cur[side].subs.length>=MAX_SUBS){ alert(`${this.cur[side].name} has used all ${MAX_SUBS} substitutions.`); return this.renderEvents(); }
+    const who = kind==='sub' ? (x.off||'') : (x.player||'');
+    const item=this.evItem(nk==='sub'?{min:x.min,off:who,on:''} : nk==='goal'?{min:x.min,player:who,kind:t==='G'?'':t} : {min:x.min,player:who,type:t}, x._n||0);
+    this.evArr(side,kind).splice(i,1); this.evArr(side,nk).push(item);
+    this.evAfter();
+  },
+  // Move an event to the other team. Players belong to one squad, so they are cleared.
+  evSetSide(side,kind,i,ns){
+    if(ns===side || !this.cur[ns]) return;
+    if(kind==='sub' && this.cur[ns].subs.length>=MAX_SUBS){ alert(`${this.cur[ns].name} has used all ${MAX_SUBS} substitutions.`); return this.renderEvents(); }
+    const x=this.evArr(side,kind)[i];
+    const item=this.evItem(kind==='sub'?{min:x.min,off:'',on:''} : kind==='goal'?{min:x.min,player:'',kind:x.kind||''} : {min:x.min,player:'',type:x.type||'Y'}, x._n||0);
+    this.evArr(side,kind).splice(i,1); this.evArr(ns,kind).push(item);
+    this._evSide=ns;
+    this.evAfter();
+  },
 
   // ---------- coach (per team, remembered as the team's default) ----------
   setCoach(side,val){
@@ -1724,10 +1864,12 @@ const MS = {
   // Repaint just one event list, so editing a row does not re-render (and scroll) the
   // whole side.
   renderGoals(side){
+    if(!this._fillMode) return this.renderEvents();
     const box=document.getElementById('goals-'+side); const s=this.cur[side];
     if(box && s) box.innerHTML=s.goals.map((g,i)=>this.goalHTML(side,g,i)).join('');
   },
   renderCards(side){
+    if(!this._fillMode) return this.renderEvents();
     const box=document.getElementById('cards-'+side); const s=this.cur[side];
     if(box && s) box.innerHTML=s.cards.map((c,i)=>this.cardHTML(side,c,i)).join('');
   },
