@@ -31,6 +31,11 @@
     color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 12px;outline:none;min-height:44px}
   input:focus,select:focus{border-color:var(--accent)}
   input.num{width:52px;text-align:center;padding:8px 4px}
+  /* No up/down spinner arrows on number boxes (minutes, score, shirt numbers) — they
+     only get in the way; the phone keypad still opens as numeric. */
+  input[type=number]{-moz-appearance:textfield;appearance:textfield}
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   label{color:var(--text2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
   /* date: visible DD/MM/YYYY text with the native calendar input overlaid invisibly */
   .datewrap{position:relative;display:inline-block}
@@ -533,9 +538,9 @@
           </div>
           <div class="hint" style="text-align:center">Tap to change (e.g. postponed match)</div>
           <div class="score">
-            <input class="num" id="homeScore" type="number" min="0" value="0" onchange="MS.touch()" />
+            <input class="num" id="homeScore" type="number" inputmode="numeric" min="0" value="0" onchange="MS.touch()" />
             <span style="color:var(--muted)">:</span>
-            <input class="num" id="awayScore" type="number" min="0" value="0" onchange="MS.touch()" />
+            <input class="num" id="awayScore" type="number" inputmode="numeric" min="0" value="0" onchange="MS.touch()" />
           </div>
           <div class="hint" style="text-align:center">Fills in from goals — editable</div>
           <input id="referee" placeholder="Referee" onchange="MS.touch()"
@@ -730,32 +735,59 @@ const MS = {
     if(name==='teams') this.renderTeams();
     if(name==='saved') this.renderSaved();
   },
-  // Pull any players added/removed in Teams & Rosters into the OPEN sheet, without losing
-  // the current XI or per-sheet number edits. Fixes: a player added mid-build didn't show
-  // up in the Squad until you re-picked the team / started a New sheet.
+  // Pull Teams & Rosters changes into the OPEN sheet: new players, and corrected shirt
+  // numbers / names. Marios fixes numbers in the roster and expects the sheet he is
+  // building to follow. A sheet opened from Saved keeps its own numbers, because a match
+  // that is already played should show the numbers worn that day.
   syncRosters(){
     ['home','away'].forEach(side=>{
-      const s=this.cur[side]; if(!s||!s.teamId) return;
-      const team=this.data.teams.find(t=>t.id===s.teamId); if(!team) return;
+      const s=this.cur[side]; if(!s) return;
+      // A re-import can give the team a new id; fall back to its name.
+      const team=this.data.teams.find(t=>t.id===s.teamId)
+              || this.data.teams.find(t=>t.name.toLowerCase()===String(s.name||'').toLowerCase());
+      if(!team) return;
+      s.teamId=team.id;
       if(!Array.isArray(s.roster)) s.roster=[]; if(!Array.isArray(s.xi)) s.xi=[];
+      // Older imports gave every player a fresh id, so the sheet may hold ids the roster
+      // no longer has. Match those by platform id / SciSports id / name and carry the
+      // sheet over to the roster's id, rather than dropping the player.
+      const byId=new Map(team.players.map(p=>[p.id,p]));
+      const remap={};
+      s.roster.forEach(p=>{
+        if(byId.has(p.id)) return;
+        const m=findSamePlayer(team.players, p);
+        if(m && !s.roster.some(q=>q.id===m.id)) remap[p.id]=m.id;
+      });
+      if(Object.keys(remap).length) this.remapIds(s, remap);
       const have=new Set(s.roster.map(p=>p.id));
-      // add players that exist on the master team but not yet in this sheet's roster
       team.players.forEach(p=>{ if(!have.has(p.id)) s.roster.push({...p}); });
-      // Re-attach identity + shirt from the master roster. A sheet started BEFORE a
-      // roster import holds a copy with no platformId, so it would keep reporting
-      // "not linked" even though the master team now has the ids. Names/numbers the
-      // user edited on the sheet are left alone.
-      const master=new Map(team.players.map(p=>[p.id,p]));
+      const keepOwnNumbers=!!this._openedSaved;
       [s.roster, s.xi].forEach(list=>list.forEach(p=>{
-        const m=master.get(p.id); if(!m) return;
+        const m=byId.get(p.id); if(!m) return;
         if(!p.platformId && m.platformId) p.platformId=m.platformId;
         if(!p.srcId && m.srcId) p.srcId=m.srcId;
+        if(!keepOwnNumbers){ if(m.num) p.num=m.num; if(m.name) p.name=m.name; }
       }));
-      // drop players removed from the master team (also pull them out of the XI)
-      const masterIds=new Set(team.players.map(p=>p.id));
-      s.roster=s.roster.filter(p=>masterIds.has(p.id));
-      s.xi=s.xi.filter(p=>masterIds.has(p.id));
+      // Drop players removed from the roster — but never one the sheet already uses
+      // (XI, subs, goals, cards), or the line-up would silently lose him.
+      const used=this.usedIds(s);
+      s.roster=s.roster.filter(p=>byId.has(p.id)||used.has(p.id));
     });
+  },
+  usedIds(s){
+    const u=new Set(s.xi.map(p=>p.id));
+    (s.subs||[]).forEach(x=>{ if(x.off) u.add(x.off); if(x.on) u.add(x.on); });
+    (s.goals||[]).forEach(g=>{ if(g.player) u.add(g.player); });
+    (s.cards||[]).forEach(c=>{ if(c.player) u.add(c.player); });
+    return u;
+  },
+  // Rename player ids everywhere on one side of the sheet.
+  remapIds(s, map){
+    const r=id=>map[id]||id;
+    [s.roster, s.xi].forEach(list=>list.forEach(p=>{ p.id=r(p.id); }));
+    (s.subs||[]).forEach(x=>{ x.off=r(x.off); x.on=r(x.on); });
+    (s.goals||[]).forEach(g=>{ g.player=r(g.player); });
+    (s.cards||[]).forEach(c=>{ c.player=r(c.player); });
   },
 
   // ---------- team/roster editor ----------
@@ -866,6 +898,20 @@ const MS = {
         + `Cancel = MERGE (add/update teams, keep the rest).`);
 
     let teamsAdded=0, teamsUpdated=0;
+    // Keep ids stable across re-imports: a team keeps its id and each player keeps his,
+    // so open and saved sheets still point at the same people. A fresh id per import is
+    // what made roster fixes vanish from an open sheet.
+    const before=this.data.teams;
+    for(const [teamName,players] of all){
+      const old=before.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
+      if(!old) continue;
+      players.forEach(pl=>{
+        const m=findSamePlayer(old.players, pl); if(!m) return;
+        pl.id=m.id; pl.pos=pl.pos||m.pos||'';
+        if(!pl.hasShirt && m.num) pl.num=m.num;
+      });
+      all.get(teamName).teamId=old.id;
+    }
     if(replaceAll) this.data.teams=[];
     // An import is authoritative from here on — never re-seed the bundled data.js
     // over it on a later reload.
@@ -873,7 +919,7 @@ const MS = {
     for(const [teamName,players] of all){
       const existing=replaceAll?null:this.data.teams.find(t=>t.name.toLowerCase()===teamName.toLowerCase());
       if(existing){ existing.players=players; existing.league=allLeague.get(teamName)||existing.league||''; teamsUpdated++; }
-      else { this.data.teams.push({id:crypto.randomUUID(), name:teamName, league:allLeague.get(teamName)||'', players}); teamsAdded++; }
+      else { this.data.teams.push({id:players.teamId||crypto.randomUUID(), name:teamName, league:allLeague.get(teamName)||'', players}); teamsAdded++; }
     }
     this.persist(); this.renderTeams(); this.refreshSelects();
     const s=document.getElementById('importStatus');
@@ -1140,13 +1186,36 @@ const MS = {
     const ids=new Set(s.xi.map(x=>x.id));
     const shown=this.filterPlayers(s.roster.filter(p=>!ids.has(p.id)), v);
     // Repaint only the bench so the search box keeps focus and the caret position.
-    box.innerHTML = shown.map(p=>this.playerHTML(side,p,'bench')).join('')
-      || (v ? '<div class="empty">No player matches “'+esc(v)+'”</div>'
-            : '<div class="empty">All players are in the XI</div>');
+    box.innerHTML = shown.map(p=>this.playerHTML(side,p,'bench')).join('') || this.benchEmpty(side, v);
+  },
+  // Empty bench: when a search finds nobody, offer to add that name as a new player
+  // right here, rather than a trip to Teams & Rosters.
+  benchEmpty(side,v){
+    if(!v) return '<div class="empty">All players are in the XI</div>';
+    const name=/^\d+$/.test(v.trim())?'':v.trim();
+    return `<div class="empty">No player matches “${esc(v)}”
+      <div style="margin-top:6px"><button class="btn-primary" onclick="MS.newPlayer('${side}',${esc(JSON.stringify(name))})">+ Add ${name?'“'+esc(name)+'”':'a new player'}</button></div></div>`;
+  },
+  // Add a player from the match sheet. He goes into this sheet's squad AND the team's
+  // saved roster, so he is there next week too.
+  newPlayer(side,name){
+    const s=this.cur[side]; if(!s) return;
+    name=(name||'').trim() || (prompt('New player — full name:')||'').trim();
+    if(!name) return;
+    const numTxt=prompt(`Shirt number for ${name}:`,'');
+    if(numTxt==null) return;
+    const np={id:crypto.randomUUID(), num:parseInt(numTxt,10)||0, name, pos:''};
+    const team=this.data.teams.find(t=>t.id===s.teamId);
+    if(team){ team.players.push({...np}); this.persist(); }
+    s.roster.push(np);
+    // Show just him on the bench so he is one tap from the XI.
+    this._search[side]=name;
+    this.renderSide(side); this.touch();
   },
   // Accent-insensitive substring match on the name, plus exact-prefix on the shirt
   // number so typing "10" finds #10 rather than every name containing a 1 or 0.
   filterPlayers(list,q){
+    list=byShirt(list);
     const t=(q||'').trim(); if(!t) return list;
     const fold=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
     const n=fold(t);
@@ -1175,9 +1244,9 @@ const MS = {
       ${this.dupWarning(t.players)}
       <p class="hint" style="margin:4px 0 8px">Each row: <b>shirt number</b> · <b>name</b> · <b>usual position</b> (optional). The usual position just auto-places the player in the right spot when you tap him onto the pitch — the match positions on the sheet come from the formation.</p>
       <div style="margin-top:8px">
-        ${t.players.map(p=>`
+        ${[...t.players.filter(p=>!p.name), ...byShirt(t.players.filter(p=>p.name))].map(p=>`
           <div class="player roster-row" style="cursor:default">
-            <input class="num" type="number" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
+            <input class="num" type="number" inputmode="numeric" value="${p.num}" title="Shirt number" onchange="MS.editPlayer('${t.id}','${p.id}','num',this.value)">
             <input class="pname" style="flex:1;min-width:0" placeholder="Player name" value="${esc(p.name)}" onchange="MS.editPlayer('${t.id}','${p.id}','name',this.value)">
             <select class="roster-pos" title="Usual position (optional) — auto-places him on the pitch" onchange="MS.editPlayer('${t.id}','${p.id}','pos',this.value)">${posOptionsHTML(p.pos)}</select>
             <button class="btn-danger" onclick="MS.delPlayer('${t.id}','${p.id}')">✕</button>
@@ -1253,6 +1322,7 @@ const MS = {
   pickTeam(side,teamId){
     const t=this.data.teams.find(x=>x.id===teamId);
     if(!t){ this.cur[side]=null; this.renderSide(side); return; }
+    this._openedSaved=false;   // a freshly picked team is a new match — follow the roster
     // copy the roster (carrying each player's remembered shirt number); number edits on
     // the lineup are persisted back to the master via rememberNumber() so they stick.
     this.cur[side]={
@@ -1349,10 +1419,9 @@ const MS = {
             placeholder="Search ${bench.length} players…" value="${esc(this._search[side]||'')}"
             oninput="MS.setSearch('${side}',this.value)">
           <div class="dropzone" id="bench-${side}" ondragover="MS.over(event)" ondragleave="MS.leave(event)" ondrop="MS.drop(event,'${side}','bench')">
-            ${shown.map(p=>this.playerHTML(side,p,'bench')).join('')
-              || (this._search[side] ? '<div class="empty">No player matches “'+esc(this._search[side])+'”</div>'
-                                     : '<div class="empty">All players are in the XI</div>')}
+            ${shown.map(p=>this.playerHTML(side,p,'bench')).join('') || this.benchEmpty(side, this._search[side])}
           </div>
+          <button class="btn-ghost no-print" onclick="MS.newPlayer('${side}')" style="margin-top:6px">+ New player</button>
         </div>
       </div>
       <div style="margin-top:14px">
@@ -1456,7 +1525,7 @@ const MS = {
     // Type-to-search rather than a plain <select> — see pickerHTML. The off/on pools
     // are the players eligible at this point in the match, not the whole roster.
     return `<div class="sub-row">
-      <input class="min" type="number" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
+      <input class="min" type="number" inputmode="numeric" placeholder="min" value="${sub.min??''}" onchange="MS.setSub('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--red)">↓</span>
       ${this.pickerHTML(offPool, sub.off, `off-${side}-${i}`,
                         `MS.setSubByLabel('${side}',${i},'off',this.value)`, 'off — type a name…')}
@@ -1626,7 +1695,7 @@ const MS = {
   },
   goalHTML(side,g,i){
     return `<div class="sub-row">
-      <input class="min" type="number" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
+      <input class="min" type="number" inputmode="numeric" placeholder="min" value="${g.min??''}" onchange="MS.setGoal('${side}',${i},'min',this.value)">
       <span class="arrow" style="color:var(--green)">⚽</span>
       ${this.pickerHTML(this.cur[side].roster, g.player, `goal-${side}-${i}`,
                         `MS.setGoalByLabel('${side}',${i},this.value)`, 'scorer — type a name…')}
@@ -1688,7 +1757,7 @@ const MS = {
   // ---------- cards (player + minute + yellow/red) ----------
   cardHTML(side,c,i){
     return `<div class="sub-row">
-      <input class="min" type="number" placeholder="min" value="${c.min??''}" onchange="MS.setCard('${side}',${i},'min',this.value)">
+      <input class="min" type="number" inputmode="numeric" placeholder="min" value="${c.min??''}" onchange="MS.setCard('${side}',${i},'min',this.value)">
       ${this.pickerHTML(this.cur[side].roster, c.player, `card-${side}-${i}`,
                         `MS.setCardByLabel('${side}',${i},this.value)`, 'player — type a name…')}
       <select class="ev-kind" onchange="MS.setCard('${side}',${i},'type',this.value)">
@@ -1756,7 +1825,7 @@ const MS = {
   },
   newSheet(){
     if(this._dirty && !confirm('Start a new sheet? Unsaved changes will be lost.')) return;
-    this.cur={home:null,away:null}; this.curId=null; this.fixtureId=''; this._dirty=false;
+    this.cur={home:null,away:null}; this.curId=null; this.fixtureId=''; this._dirty=false; this._openedSaved=false;
     localStorage.removeItem('scios_ms_draft');
     document.getElementById('homeScore').value=0; document.getElementById('awayScore').value=0;
     document.getElementById('referee').value='';
@@ -1809,6 +1878,7 @@ const MS = {
     document.getElementById('awayScore').value=s.awayScore||0;
     document.getElementById('homeName').innerHTML=crestImg(s.home.name,'crest-lg')+esc(s.home.name);
     document.getElementById('awayName').innerHTML=crestImg(s.away.name,'crest-lg')+esc(s.away.name);
+    this._openedSaved=true;   // keep this sheet's own shirt numbers (see syncRosters)
     this.refreshSelects(); this.renderSide('home'); this.renderSide('away');
     this._dirty=false; this.tab('build');
   },
@@ -2447,6 +2517,20 @@ function normDate(d){
 function todayDDMMYYYY(){
   const d=new Date();
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+// The same person in another copy of a roster: platform id, then SciSports id, then
+// name (accent- and case-insensitive). Used to keep ids stable across re-imports.
+function findSamePlayer(list, p){
+  const fold=x=>String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  return (p.platformId && list.find(q=>q.platformId===p.platformId))
+      || (p.srcId && list.find(q=>q.srcId===p.srcId))
+      || (p.name && list.find(q=>fold(q.name)===fold(p.name)))
+      || null;
+}
+// Squad order: by shirt number; players with no number yet (0/blank) go last.
+function byShirt(list){
+  const n=p=>(+p.num>0?+p.num:1e9);
+  return [...list].sort((a,b)=>n(a)-n(b) || String(a.name).localeCompare(String(b.name)));
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function lastName(n){const p=String(n||'').trim().split(' ');return p[p.length-1];}
