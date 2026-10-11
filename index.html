@@ -58,6 +58,26 @@
   .modal-backdrop.open{display:flex}
   .modal{background:var(--surface1);border:1px solid var(--border);border-radius:var(--radius);
     padding:18px;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+  /* player picker sheet: tall, scrollable list with big tap rows */
+  .pick-modal{max-width:480px;display:flex;flex-direction:column;max-height:88vh;padding:14px}
+  #pickList{overflow-y:auto;margin-top:8px;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+  .pick-h{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;
+    padding:10px 4px 4px}
+  .pick-h span{color:var(--muted);font-weight:600}
+  .pick-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface2);
+    color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 10px;margin-bottom:5px;
+    font-size:15px;font-weight:600;cursor:pointer}
+  .pick-row:hover{border-color:var(--accent)}
+  .pick-row.sel{border-color:var(--accent);background:var(--surface3)}
+  .pick-num{flex:none;min-width:34px;text-align:center;font-weight:800;color:var(--accent)}
+  .pick-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  input.subpick{cursor:pointer;padding-right:28px;background-repeat:no-repeat;background-position:right 10px center;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2394a3b8' stroke-width='2'/%3E%3C/svg%3E")}
+  @media(max-width:760px){
+    /* phone: the list fills the screen so many players are visible at once */
+    #pickSheet{padding:0;align-items:stretch}
+    .pick-modal{max-width:none;max-height:none;height:100%;border-radius:0}
+  }
   .linkbox{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
     padding:10px 12px;font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;
     text-overflow:ellipsis;font-family:ui-monospace,Menlo,Consolas,monospace}
@@ -653,6 +673,19 @@
       <button class="btn-ghost" style="flex:1" onclick="MS.shareWhatsApp()">🟢 WhatsApp</button>
     </div>
     <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="MS.closeShare()">Close</button>
+  </div>
+</div>
+<!-- Player picker sheet (subs / goals / cards) — a full list instead of the browser's small pop-up -->
+<div id="pickSheet" class="modal-backdrop no-print" onclick="if(event.target===this)MS.closePick()">
+  <div class="modal pick-modal">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:nowrap">
+      <h3 id="pickTitle" style="margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pick a player</h3>
+      <button class="btn-ghost" onclick="MS.closePick()" title="Close">✕</button>
+    </div>
+    <input id="pickSearch" type="search" autocomplete="off" placeholder="Search name or shirt number…"
+      oninput="MS.renderPick()" onkeydown="MS.pickKey(event)" style="width:100%">
+    <div id="pickList"></div>
+    <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="MS.clearPick()">Clear selection</button>
   </div>
 </div>
 <!-- Dedicated one-page print sheet (filled on Export PDF / Preview; only visible when printing or previewing) -->
@@ -1802,20 +1835,74 @@ const MS = {
     return this.cur[side].roster
       .map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.num} ${esc(p.name)}</option>`).join('');
   },
-  // Type-to-search player picker, shared by substitutions, goals and cards. A plain
-  // <select> over a 64-player squad means scrolling the whole roster; a <datalist>
-  // filters as you type and still opens the full list on a tap.
+  // Player picker, shared by substitutions, goals and cards. A tap opens a full-size
+  // list of every eligible player (grouped: Starting XI / Came on / Bench, by shirt
+  // number) with a search box. It replaced a <datalist>, whose browser pop-up shows only
+  // a few names at a time on a phone and has to be scrolled to find anyone (Marios).
   //   pool     players to choose from
   //   selId    currently selected player id
-  //   listId   unique id for this row's <datalist>
-  //   onChange JS expression called with the typed text
+  //   listId   unique id for this picker (side is read from it: …-home-… / …-away-…)
+  //   onChange JS expression called with the picked "<number> <name>" label
+  _pools:{},
   pickerHTML(pool, selId, listId, onChange, placeholder){
+    this._pools[listId]=pool;
     const sel=pool.find(p=>p.id===selId);
     const value=sel?`${sel.num} ${sel.name}`:'';
-    return `<input class="subpick" list="${listId}" placeholder="${esc(placeholder)}" autocomplete="off"
-        value="${esc(value)}" onchange="${onChange}">
-      <datalist id="${listId}">${pool.map(p=>`<option value="${esc(p.num+' '+p.name)}"></option>`).join('')}</datalist>`;
+    return `<input class="subpick" readonly data-list="${listId}" data-ph="${esc(placeholder)}" placeholder="${esc(placeholder)}"
+        value="${esc(value)}" onclick="MS.openPick(this)"
+        onkeydown="if(event.key==='Enter'||event.key===' '||/^[0-9a-z]$/i.test(event.key)){event.preventDefault();MS.openPick(this,/^[0-9a-z]$/i.test(event.key)?event.key:'')}"
+        onchange="${onChange}">`;
   },
+  _pick:null,   // {el, pool, side} while the picker sheet is open
+  openPick(el, typed){
+    const id=el.dataset.list, pool=this._pools[id]||[];
+    const side=(id.match(/-(home|away)-/)||[])[1];
+    this._pick={el, pool, side};
+    document.getElementById('pickTitle').textContent=(el.dataset.ph||'Pick a player').replace(/\s+—.*$/,'').replace(/^./,c=>c.toUpperCase())
+      + (side&&this.cur[side]?` — ${this.cur[side].name}`:'');
+    const q=document.getElementById('pickSearch'); q.value=typed||'';
+    this.renderPick();
+    document.getElementById('pickSheet').classList.add('open');
+    // Phones: don't pop the keyboard over the list — the point is to see everyone.
+    if(typed || !matchMedia('(pointer:coarse)').matches) q.focus();
+  },
+  renderPick(){
+    const P=this._pick; if(!P) return;
+    const q=document.getElementById('pickSearch').value;
+    const s=P.side?this.cur[P.side]:null;
+    const xi=new Set(s?s.xi.map(p=>p.id):[]);
+    const cameOn=new Set(s?(s.subs||[]).map(x=>x.on).filter(Boolean):[]);
+    const shown=this.filterPlayers(P.pool, q);
+    const cur=P.el.value;
+    const row=p=>`<button class="pick-row ${cur===p.num+' '+p.name?'sel':''}" onclick="MS.choosePick('${p.id}')">
+        <span class="pick-num">${esc(p.num)}</span><span class="pick-name">${esc(p.name)}</span></button>`;
+    const groups=[['Starting XI',shown.filter(p=>xi.has(p.id))],
+                  ['Came on',shown.filter(p=>!xi.has(p.id)&&cameOn.has(p.id))],
+                  [xi.size?'Bench':'Squad',shown.filter(p=>!xi.has(p.id)&&!cameOn.has(p.id))]];
+    document.getElementById('pickList').innerHTML =
+      groups.filter(g=>g[1].length).map(([h,l])=>`<div class="pick-h">${h} <span>${l.length}</span></div>${l.map(row).join('')}`).join('')
+      || `<div class="empty" style="padding:16px">${q?'No player matches “'+esc(q)+'”':'No players available here.'}</div>`;
+  },
+  choosePick(pid){
+    const P=this._pick; if(!P) return;
+    const p=P.pool.find(x=>x.id===pid);
+    this.closePick();
+    P.el.value=p?`${p.num} ${p.name}`:'';
+    P.el.dispatchEvent(new Event('change'));
+  },
+  // Enter in the search picks the first player shown — so "11 ⏎" is the whole entry.
+  pickKey(e){
+    if(e.key==='Escape') return this.closePick();
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    // An exact shirt number wins over a prefix match ("1" is #1, not #10).
+    const q=document.getElementById('pickSearch').value.trim();
+    const rows=[...document.querySelectorAll('#pickList .pick-row')];
+    const hit=rows.find(r=>r.querySelector('.pick-num').textContent===q) || rows[0];
+    if(hit) hit.click();
+  },
+  clearPick(){ const P=this._pick; if(!P) return; this.closePick(); P.el.value=''; P.el.dispatchEvent(new Event('change')); },
+  closePick(){ document.getElementById('pickSheet').classList.remove('open'); this._pick=null; },
   // Resolve typed text back to a player id: the exact "<number> <name>" label, an
   // exact name, an exact shirt number, or an unambiguous partial name. Returns '' when
   // nothing matches or the term is ambiguous — better blank than the wrong player.
