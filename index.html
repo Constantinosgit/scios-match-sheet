@@ -69,6 +69,7 @@
     font-size:15px;font-weight:600;cursor:pointer}
   .pick-row:hover{border-color:var(--accent)}
   .pick-row.sel{border-color:var(--accent);background:var(--surface3)}
+  .pick-row .crest{width:26px;height:26px}
   .pick-num{flex:none;min-width:34px;text-align:center;font-weight:800;color:var(--accent)}
   .pick-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   input.subpick{cursor:pointer;padding-right:28px;background-repeat:no-repeat;background-position:right 10px center;
@@ -261,6 +262,25 @@
     .ev-row .ev-pick{flex-basis:100%}
   }
   body.fillmode #eventsCard{display:none!important}
+  /* coach screen (#c= link): formation buttons + a pitch of shirt-number boxes */
+  .coach-head{display:flex;align-items:center;gap:6px;font-size:18px;margin-bottom:6px}
+  .coach-step{display:flex;align-items:center;gap:8px;font-weight:700;margin:16px 0 8px}
+  .coach-n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:14px}
+  .coach-forms{display:flex;flex-wrap:wrap;gap:8px}
+  .coach-form{flex:1 1 110px;padding:12px 8px;font-size:16px;font-weight:700;background:var(--surface2);
+    color:var(--text);border:2px solid var(--border);border-radius:10px}
+  .coach-form.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .coach-spot{width:84px;cursor:default}
+  .coach-num{width:58px;height:58px;padding:0;border-radius:50%;text-align:center;font-size:22px;font-weight:800;
+    background:#8B5CF6;color:#fff;border:3px solid #fff;box-shadow:0 2px 9px rgba(0,0,0,.5)}
+  .coach-num::placeholder{color:rgba(255,255,255,.6)}
+  .coach-num:focus{background:var(--amber);border-color:#fff;outline:none}
+  .coach-num.dup{background:#DC2626}
+  .coach-spot .lbl{color:#fff;font-size:12px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8);margin-top:2px}
+  .coach-send{width:100%;margin-top:16px;padding:14px;font-size:17px}
+  body.coachmode .coach-pitch{aspect-ratio:5/6;max-width:520px}
+  @media(max-width:760px){ .coach-num{width:48px;height:48px;font-size:19px} .coach-spot{width:64px} }
 
   .saved-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--border);
     border-radius:8px;margin-bottom:6px;background:var(--surface2);flex-wrap:wrap}
@@ -685,7 +705,7 @@
     <input id="pickSearch" type="search" autocomplete="off" placeholder="Search name or shirt number…"
       oninput="MS.renderPick()" onkeydown="MS.pickKey(event)" style="width:100%">
     <div id="pickList"></div>
-    <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="MS.clearPick()">Clear selection</button>
+    <button class="btn-ghost" id="pickClear" style="width:100%;margin-top:8px" onclick="MS.clearPick()">Clear selection</button>
   </div>
 </div>
 <!-- Dedicated one-page print sheet (filled on Export PDF / Preview; only visible when printing or previewing) -->
@@ -1422,6 +1442,7 @@ const MS = {
   },
   renderSide(side){
     const panel=document.getElementById(side+'Panel');
+    if(this._coach){ if(side==='home') this.renderCoach(); else panel.innerHTML=''; return; }
     const s=this.cur[side];
     if(!s){ panel.innerHTML='<div class="empty">Select a team above.</div>'; this.renderEvents(); return; }
     const benchIds=new Set(s.xi.map(x=>x.id));
@@ -1441,6 +1462,7 @@ const MS = {
         <h3>${crestImg(s.name,'crest-lg')}${esc(s.name)}</h3>
         <div class="row">
           <label style="align-self:center">Formation</label>
+          ${s.formation&&s.xi.length?`<button class="btn-ghost no-print" onclick="MS.saveFormationImage('${side}')" title="Download a picture of the formation">📷 Image</button>`:''}
           <select onchange="MS.setFormation('${side}',this.value)">
             <option value="" ${!s.formation?'selected':''}>— No formation (list only) —</option>
             ${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${f===s.formation?'selected':''}>${fmtFormation(f)}</option>`).join('')}
@@ -1861,14 +1883,38 @@ const MS = {
     document.getElementById('pickTitle').textContent=(el.dataset.ph||'Pick a player').replace(/\s+—.*$/,'').replace(/^./,c=>c.toUpperCase())
       + (side&&this.cur[side]?` — ${this.cur[side].name}`:'');
     const q=document.getElementById('pickSearch'); q.value=typed||'';
+    q.placeholder='Search name or shirt number…';
+    document.getElementById('pickClear').style.display='';
     this.renderPick();
     document.getElementById('pickSheet').classList.add('open');
     // Phones: don't pop the keyboard over the list — the point is to see everyone.
     if(typed || !matchMedia('(pointer:coarse)').matches) q.focus();
   },
+  // The same sheet, listing teams — used by "Share empty sheet to a coach" (the old
+  // prompt() showed ~20 of 86 teams and made you type a number).
+  openTeamPick(title, cb){
+    this._pick={mode:'team', cb};
+    document.getElementById('pickTitle').textContent=title;
+    document.getElementById('pickSearch').value='';
+    document.getElementById('pickSearch').placeholder='Search team…';
+    document.getElementById('pickClear').style.display='none';
+    this.renderPick();
+    document.getElementById('pickSheet').classList.add('open');
+    if(!matchMedia('(pointer:coarse)').matches) document.getElementById('pickSearch').focus();
+  },
   renderPick(){
     const P=this._pick; if(!P) return;
     const q=document.getElementById('pickSearch').value;
+    if(P.mode==='team'){
+      const fold=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const n=fold(q.trim());
+      P.shown=[...this.data.teams].sort((a,b)=>a.name.localeCompare(b.name)).filter(t=>!n||fold(t.name).includes(n));
+      document.getElementById('pickList').innerHTML=
+        `<div class="pick-h">Teams <span>${P.shown.length}</span></div>`
+        + (P.shown.map((t,i)=>`<button class="pick-row" onclick="MS.chooseTeamPick(${i})">${crestImg(t.name,'crest')}<span class="pick-name">${esc(t.name)}</span></button>`).join('')
+           || `<div class="empty" style="padding:16px">No team matches “${esc(q)}”</div>`);
+      return;
+    }
     const s=P.side?this.cur[P.side]:null;
     const xi=new Set(s?s.xi.map(p=>p.id):[]);
     const cameOn=new Set(s?(s.subs||[]).map(x=>x.on).filter(Boolean):[]);
@@ -1882,6 +1928,10 @@ const MS = {
     document.getElementById('pickList').innerHTML =
       groups.filter(g=>g[1].length).map(([h,l])=>`<div class="pick-h">${h} <span>${l.length}</span></div>${l.map(row).join('')}`).join('')
       || `<div class="empty" style="padding:16px">${q?'No player matches “'+esc(q)+'”':'No players available here.'}</div>`;
+  },
+  chooseTeamPick(i){
+    const P=this._pick; if(!P||!P.shown) return;
+    const t=P.shown[i]; this.closePick(); if(t) P.cb(t);
   },
   choosePick(pid){
     const P=this._pick; if(!P) return;
@@ -1898,7 +1948,7 @@ const MS = {
     // An exact shirt number wins over a prefix match ("1" is #1, not #10).
     const q=document.getElementById('pickSearch').value.trim();
     const rows=[...document.querySelectorAll('#pickList .pick-row')];
-    const hit=rows.find(r=>r.querySelector('.pick-num').textContent===q) || rows[0];
+    const hit=rows.find(r=>{ const n=r.querySelector('.pick-num'); return n&&n.textContent===q; }) || rows[0];
     if(hit) hit.click();
   },
   clearPick(){ const P=this._pick; if(!P) return; this.closePick(); P.el.value=''; P.el.dispatchEvent(new Event('change')); },
@@ -2370,32 +2420,197 @@ const MS = {
   },
   baseUrl(){ return location.origin+location.pathname; },
 
-  // 1) Send a sheet to a coach. Pick a team → make a SELF-CONTAINED #fill= link that
-  // carries the roster in the URL. This works on ANY device (the coach needn't have the
-  // team in his data) — essential because imported teams have device-local ids. The link
-  // is long, but the share modal keeps it tidy; a short branded link awaits the platform
-  // short-link endpoint (tracked for Cleanthis).
+  // 1) Send a sheet to a coach. Pick a team from the searchable list → a SHORT link that
+  // carries only the team name (#c=AEK%20U15). The coach screen asks for nothing but the
+  // formation and a shirt number per position, so no roster has to travel in the URL.
+  // The old links packed the whole squad in base64 — long enough that browsers and
+  // WhatsApp flagged them as dangerous (Marios). #fill= / #sheet= links still open.
   shareEmpty(){
-    const teams=[...this.data.teams].sort((a,b)=>a.name.localeCompare(b.name));
-    if(!teams.length){ alert('No teams available.'); return; }
-    const list=teams.map((t,i)=>`${i+1}. ${t.name}`).join('\n');
-    const pick=prompt('Send a sheet for which team?\n\nType the number:\n\n'+list);
-    if(pick==null) return;
-    const t=teams[parseInt(pick,10)-1];
-    if(!t){ alert('No team for that number.'); return; }
-    // Optionally pre-fill the team's last line-up for the coach to CORRECT, else send blank.
-    const last=this.lastSavedFor(t.name);
-    const prefill = last && last.team.xi && last.team.xi.length
-      && confirm(`Pre-fill ${t.name} with its last line-up for the coach to correct?\n\n`
-        + `OK = send last line-up (${fmtFormation(last.team.formation)}, ${last.team.xi.length} players) to adjust.\n`
-        + `Cancel = send a blank sheet to fill from scratch.`);
-    const payload={t:'fill', id:t.id, name:t.name,
-      formation: prefill ? (last.team.formation||'') : '',   // blank → coach starts list-only
-      roster:t.players.map(p=>[p.id,p.num,p.name]),
-      xi: prefill ? (last.team.xi||[]).map(p=>p.id) : []};
-    const url=this.baseUrl()+'#fill='+this.encodePayload(payload);
-    this.offerShareLink(`Line-up for ${t.name}`,
-      `Coach — please ${prefill?'check/correct':'fill in'} ${t.name}'s line-up here, then tap “Send back”:\n${url}`, url);
+    if(!this.data.teams.length){ alert('No teams available.'); return; }
+    this.openTeamPick('Send to a coach — pick the team', t=>{
+      // Optionally pre-fill the last formation + numbers for the coach to correct.
+      const last=this.lastSavedFor(t.name);
+      const lt=last&&last.team;
+      const canPrefill = lt && lt.formation && FORMATIONS[lt.formation] && lt.xi && lt.xi.length===11;
+      const prefill = canPrefill && confirm(`Pre-fill ${t.name} with its last formation (${fmtFormation(lt.formation)}) and shirt numbers for the coach to correct?\n\nOK = pre-fill · Cancel = send it blank`);
+      const url=this.baseUrl()+'#c='+coachCode(prefill?{name:t.name, formation:lt.formation, nums:lt.xi.map(p=>p.num)}:{name:t.name});
+      this.offerShareLink(`Line-up for ${t.name}`,
+        `Coach — please fill in ${t.name}'s formation and shirt numbers here, then tap “Send back”:\n${url}`, url);
+    });
+  },
+
+  // ---------- coach screen (#c= link) ----------
+  // Formation buttons + a pitch with one shirt-number box per position. That is all a
+  // coach has to do. Progress is kept on the coach's phone in case the page reloads.
+  _coach:null,
+  openCoach(p){
+    const key='scios_ms_coach_'+p.name.toLowerCase();
+    let saved=null; try{ saved=JSON.parse(localStorage.getItem(key)||'null'); }catch(e){}
+    const start=(!p.formation && saved && saved.name===p.name) ? saved : p;
+    this._coach={name:p.name, formation:FORMATIONS[start.formation]?start.formation:'',
+      nums:Array.from({length:11},(_,i)=>(start.nums||[])[i]||''), coach:start.coach||'', key};
+    this.fillModeFor(true);
+    this.cur.home=null; this.cur.away=null;
+    document.body.classList.add('coachmode');
+    this.renderSide('home'); this.renderSide('away'); this.showTeam('home');
+  },
+  saveCoach(){ const C=this._coach; try{ localStorage.setItem(C.key, JSON.stringify(C)); }catch(e){} },
+  renderCoach(){
+    const C=this._coach, f=FORMATIONS[C.formation];
+    const panel=document.getElementById('homePanel');
+    const forms=Object.keys(FORMATIONS).map(k=>
+      `<button class="coach-form ${k===C.formation?'on':''}" onclick="MS.coachForm(${esc(JSON.stringify(k))})">${esc(fmtFormation(k))}</button>`).join('');
+    const spots=f?f.coords.map(([x,y],i)=>`<div class="spot coach-spot" style="left:${x}%;top:${y}%">
+        <input class="coach-num" id="cn-${i}" type="number" inputmode="numeric" enterkeyhint="next" placeholder="#"
+          value="${C.nums[i]}" oninput="MS.coachNum(${i},this.value)" onkeydown="MS.coachKey(event,${i})" aria-label="${esc(f.pos[i])} shirt number">
+        <div class="lbl">${esc(f.pos[i])}</div></div>`).join(''):'';
+    panel.innerHTML=`
+      <div class="coach-head">${crestImg(C.name,'crest-lg')}<div><b>${esc(C.name)}</b><div class="hint" style="margin:0">Starting line-up</div></div></div>
+      <div class="coach-step"><span class="coach-n">1</span>Pick your formation</div>
+      <div class="coach-forms">${forms}</div>
+      ${f?`
+      <div class="coach-step"><span class="coach-n">2</span>Tap each position and type the shirt number</div>
+      <div class="pitch pitch-home coach-pitch">
+        <div class="line halfway"></div><div class="circle"></div>
+        <div class="box top"></div><div class="box bot"></div>
+        ${spots}
+      </div>
+      <div id="coachStatus" class="hint" style="text-align:center;margin-top:6px"></div>
+      <div class="coach-step"><span class="coach-n">3</span>Coach name <span class="hint" style="margin:0">(optional)</span></div>
+      <input id="coachName" placeholder="Your name" value="${esc(C.coach)}" oninput="MS.coachSetName(this.value)" style="width:100%">
+      <button class="btn-primary coach-send" onclick="MS.coachSend()">📤 Send line-up back</button>`
+      :`<div class="hint" style="margin-top:10px">Then you'll type the shirt number for each position.</div>`}`;
+    this.coachStatus();
+  },
+  coachForm(k){ this._coach.formation=k; this.saveCoach(); this.renderCoach(); },
+  coachNum(i,v){ this._coach.nums[i]=parseInt(v,10)>0?parseInt(v,10):''; this.saveCoach(); this.coachStatus(); },
+  coachSetName(v){ this._coach.coach=v.trim(); this.saveCoach(); },
+  // Enter / "next" on the keypad jumps to the next position.
+  coachKey(e,i){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    const nx=document.getElementById('cn-'+(i+1));
+    if(nx) nx.focus(); else e.target.blur();
+  },
+  coachProblems(){
+    const n=this._coach.nums, filled=n.filter(Boolean);
+    const seen={}, dups=[];
+    filled.forEach(x=>{ if(seen[x]&&!dups.includes(x)) dups.push(x); seen[x]=1; });
+    return {missing:11-filled.length, dups};
+  },
+  coachStatus(){
+    const el=document.getElementById('coachStatus'); if(!el) return;
+    const {missing,dups}=this.coachProblems();
+    el.innerHTML = dups.length ? `<span style="color:var(--amber);font-weight:700">⚠ Number ${dups.join(', ')} is used twice</span>`
+      : missing ? `${11-missing}/11 positions filled` : `<span style="color:var(--green);font-weight:700">✓ All 11 positions filled</span>`;
+    document.querySelectorAll('.coach-num').forEach((el,i)=>{ el.classList.toggle('dup', dups.includes(this._coach.nums[i])); });
+  },
+  coachSend(){
+    const C=this._coach, {missing,dups}=this.coachProblems();
+    if(missing){ alert(`Please fill all 11 positions — ${missing} still empty.`); return; }
+    if(dups.length){ alert(`Shirt number ${dups.join(', ')} is used twice — please check.`); return; }
+    const url=this.baseUrl()+'#r='+coachCode(C);
+    this.offerShareLink(`${C.name} line-up`,
+      `${C.name} line-up (${fmtFormation(C.formation)}) — open to load it:\n${url}`, url);
+  },
+
+  // ---------- formation image ----------
+  // A picture of just the team name, crest, formation and pitch (number + surname per
+  // position) — to send to SciSports instead of a screenshot. Drawn on a canvas, so it
+  // looks the same on every device.
+  async saveFormationImage(side){
+    const s=this.cur[side]; if(!s||!s.formation) return;
+    const f=FORMATIONS[s.formation]; if(!f) return;
+    const loadImg=src=>new Promise(res=>{ if(!src) return res(null); const im=new Image();
+      const t=setTimeout(()=>res(null),4000); im.onload=()=>{clearTimeout(t);res(im);}; im.onerror=()=>{clearTimeout(t);res(null);}; im.src=src; });
+    const [crest,logo]=await Promise.all([loadImg(teamLogo(s.name)), loadImg('logos/Logo-scios-dark.png')]);   // the dark-background version
+    const draw=withImages=>{
+      const W=1080,H=1350,c=document.createElement('canvas'); c.width=W; c.height=H;
+      const g=c.getContext('2d');
+      g.fillStyle='#0A1628'; g.fillRect(0,0,W,H);
+      // header: crest · team name · formation
+      let tx=60;
+      if(withImages&&crest){ const k=Math.min(120/crest.width,120/crest.height); g.drawImage(crest,60,40,crest.width*k,crest.height*k); tx=200; }
+      g.fillStyle='#fff'; g.textBaseline='alphabetic'; g.textAlign='left';
+      let fs=58; do{ g.font=`800 ${fs}px Inter,Segoe UI,Arial,sans-serif`; fs-=2; }while(g.measureText(s.name).width>W-tx-60 && fs>28);
+      g.fillText(s.name,tx,100);
+      g.fillStyle='#22D3EE'; g.font='700 40px Inter,Segoe UI,Arial,sans-serif';
+      g.fillText(fmtFormation(s.formation),tx,152);
+      // pitch
+      const px=60,py=200,pw=960,ph=1040;
+      for(let i=0;i<8;i++){ g.fillStyle=i%2?'#2a8139':'#2e8b40'; g.fillRect(px,py+i*ph/8,pw,ph/8); }
+      g.strokeStyle='rgba(255,255,255,.6)'; g.lineWidth=4;
+      g.strokeRect(px,py,pw,ph);
+      g.beginPath(); g.moveTo(px,py+ph/2); g.lineTo(px+pw,py+ph/2); g.stroke();
+      g.beginPath(); g.arc(px+pw/2,py+ph/2,pw*0.11,0,Math.PI*2); g.stroke();
+      g.strokeRect(px+pw*0.25,py,pw*0.5,ph*0.16); g.strokeRect(px+pw*0.25,py+ph*0.84,pw*0.5,ph*0.16);
+      // players
+      const dot=side==='away'?'#EC4899':'#8B5CF6';
+      s.xi.slice(0,11).forEach((p,i)=>{
+        const [x,y]=f.coords[i]||[50,50], cx=px+x/100*pw, cy=py+y/100*ph, r=46;
+        g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fillStyle=dot; g.fill();
+        g.lineWidth=5; g.strokeStyle='#fff'; g.stroke();
+        g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle';
+        g.font='800 38px Inter,Segoe UI,Arial,sans-serif'; g.fillText(String(p.num||''),cx,cy+1);
+        const nm=lastName(p.name); let ns=30;
+        do{ g.font=`700 ${ns}px Inter,Segoe UI,Arial,sans-serif`; ns-=1; }while(g.measureText(nm).width>200 && ns>18);
+        g.textBaseline='top'; g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=6;
+        g.fillText(nm,cx,cy+r+8); g.shadowBlur=0;
+      });
+      // footer
+      g.textAlign='left'; g.textBaseline='middle';
+      if(withImages&&logo){ const k=56/logo.height; g.drawImage(logo,60,1268,logo.width*k,56); }
+      g.textAlign='right'; g.fillStyle='#64748b'; g.font='600 24px Inter,Segoe UI,Arial,sans-serif';
+      g.fillText('matchsheet.scienceofsports.net',W-60,1296);
+      return c;
+    };
+    const toBlob=c=>new Promise((res,rej)=>{ try{ c.toBlob(b=>b?res(b):rej(new Error('blank')),'image/png'); }catch(e){ rej(e); } });
+    let blob;
+    try{ blob=await toBlob(draw(true)); }catch(e){ blob=await toBlob(draw(false)); }   // images can block export when opened from a file
+    const fname=`${s.name} ${fmtFormation(s.formation)}.png`.replace(/[\\/:*?"<>|]/g,'');
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.canShare && matchMedia('(pointer:coarse)').matches && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:`${s.name} formation`}); return; }
+      catch(e){ if(e&&e.name==='AbortError') return; }
+    }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  },
+
+  // ---------- coach's reply (#r= link) → into the match sheet ----------
+  // Numbers are matched to the roster on THIS device, so names and positions fill in.
+  // A number the roster doesn't have becomes "Player #23" on the team, to rename later.
+  loadCoachReturn(p){
+    const side=this.chooseSideFor(p.name);
+    if(side===null) return;
+    const same=x=>String(x||'').toLowerCase()===String(p.name).toLowerCase();
+    const team=this.data.teams.find(t=>same(t.name));
+    let s=this.cur[side];
+    if(!s || !same(s.name)){
+      s=this.cur[side]={teamId:team?team.id:null, name:team?team.name:p.name, league:team?(team.league||''):'',
+        roster:team?team.players.map(x=>({...x})):[], xi:[], formation:'', subs:[],
+        coach:team?(team.coach||''):'', goals:[], cards:[]};
+      document.getElementById(side+'Name').innerHTML=crestImg(s.name,'crest-lg')+esc(s.name);
+    }
+    const unknown=[];
+    s.xi=p.nums.slice(0,11).map(n=>{
+      let pl=s.roster.find(x=>+x.num===+n);
+      if(!pl){
+        pl={id:crypto.randomUUID(), num:+n, name:`Player #${n}`, pos:''};
+        s.roster.push(pl);
+        if(team) team.players.push({...pl});
+        unknown.push(n);
+      }
+      return pl;
+    });
+    s.formation=FORMATIONS[p.formation]?p.formation:'';
+    if(p.coach) s.coach=p.coach;
+    if(team && unknown.length) this.persist();
+    this.refreshSelects(); this.renderSide('home'); this.renderSide('away');
+    this.showTeam(side); this.updateStrip(); this.touch();
+    alert(`${s.name} line-up loaded into the ${side==='home'?'Home':'Away'} side (${fmtFormation(s.formation)}).`
+      + (unknown.length?`\n\nShirt number${unknown.length>1?'s':''} ${unknown.join(', ')} ${unknown.length>1?'are':'is'} not in your roster — added as “Player #…”. Rename in Teams & Rosters.`:''));
   },
 
   // 2) Coach sends the COMPLETED side back as a #sheet= link that loads into your tool.
@@ -2458,6 +2673,18 @@ const MS = {
   //   #sheet=<b64>  a completed side sent back by a coach
   handleLink(){
     const h=location.hash||'';
+    // Short coach link (#c=) and the coach's reply (#r=) — see shareEmpty / coachSend.
+    const cm=h.match(/^#([cr])=(.+)$/);
+    if(cm){
+      const p=parseCoachCode(cm[2]);
+      if(!p.name){ alert('That link could not be opened.'); return false; }
+      if(cm[1]==='c'){ this.openCoach(p); return true; }   // keep the hash: a reload reopens it
+      history.replaceState(null,'',this.baseUrl());
+      this.restoreDraft(); this.refreshSelects();
+      this.loadCoachReturn(p);
+      this.renderSide('home'); this.renderSide('away'); this.updateStrip();
+      return true;
+    }
     // Short team-id form
     const tm=h.match(/^#t=(.+)$/);
     if(tm){
@@ -2746,6 +2973,19 @@ function normDate(d){
 function todayDDMMYYYY(){
   const d=new Date();
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+// Short, readable link payload: name~formation~numbers~coach (each URI-encoded, numbers
+// dot-separated in position order). Trailing empty parts are dropped.
+function coachCode(o){
+  const parts=[encodeURIComponent(o.name||''), o.formation?encodeURIComponent(o.formation):'',
+    (o.nums||[]).some(Boolean)?(o.nums||[]).join('.'):'', o.coach?encodeURIComponent(o.coach):''];
+  while(parts.length>1 && !parts[parts.length-1]) parts.pop();
+  return parts.join('~');
+}
+function parseCoachCode(str){
+  const d=x=>{ try{ return decodeURIComponent(x||''); }catch(e){ return ''; } };
+  const [n,f,nums,c]=String(str).split('~');
+  return {name:d(n).trim(), formation:d(f), nums:(nums||'').split('.').filter(x=>x!=='').map(x=>parseInt(x,10)||''), coach:d(c)};
 }
 // The same person in another copy of a roster: platform id, then SciSports id, then
 // name (accent- and case-insensitive). Used to keep ids stable across re-imports.
